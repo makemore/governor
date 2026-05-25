@@ -1,0 +1,43 @@
+{
+  "checklist": {
+    "key": "agent-handoff-v1",
+    "title": "Agent-produced migration: human + CI handoff",
+    "items": [
+      {
+        "key": "author-statement",
+        "description": "The agent that produced the work attests to having produced it.",
+        "rule": { "actor_with_kind": "agent" }
+      },
+      {
+        "key": "tests-green",
+        "description": "CI confirms the test suite passes on the candidate commit.",
+        "rule": { "actor_with_role": "ci" }
+      },
+      {
+        "key": "schema-approved",
+        "description": "A human DBA approves the schema impact of the migration.",
+        "rule": {
+          "all_of": [
+            { "actor_with_kind": "human" },
+            { "actor_with_role": "dba" }
+          ]
+        }
+      },
+      {
+        "key": "release-approved",
+        "description": "A human release manager gives the final go.",
+        "rule": {
+          "all_of": [
+            { "actor_with_kind": "human" },
+            { "actor_with_role": "release-manager" }
+          ]
+        }
+      }
+    ]
+  },
+  "subject": {
+    "id": "01999999-aaaa-7aaa-8aaa-aaaaaaaaaaaa",
+    "label": "migration 2026_05_25_add_audit_log",
+    "kind": "migration"
+  }
+}

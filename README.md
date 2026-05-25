@@ -17,6 +17,7 @@ Designed to be embedded, self-hosted, or consumed as a hosted service.
 | [`cli/`](./cli) | Command-line clients |
 | [`mcp/`](./mcp) | Model Context Protocol surface for AI agents |
 | [`sdks/`](./sdks) | Client libraries |
+| [`examples/`](./examples) | Runnable end-to-end walkthroughs against a deployed server |
 
 Each language gets its own subdirectory inside these folders — for example
 `core/python/`, `cli/python/`, and later `core/go/`, `cli/go/`.
