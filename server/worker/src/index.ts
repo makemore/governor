@@ -6,6 +6,13 @@ import type { D1PreparedStatement } from '@cloudflare/workers-types';
 import { Hono } from 'hono';
 import { auth, requireAdmin } from './auth.js';
 import { mintTokenString, newUuid, nowIso, sha256Hex } from './crypto.js';
+import {
+  isPublicEnabled,
+  loadRecentActivity,
+  loadRecentSubjects,
+  readPublicConfig,
+} from './public.js';
+import { renderPublicPage } from './public-render.js';
 import { gateRun, loadRun, serialiseAttestation, serialiseRun } from './runs.js';
 import type { ActorKind, AuthedActor, Env } from './types.js';
 
@@ -39,31 +46,39 @@ app.get('/apple-touch-icon.png', () => {
 // iOS probes both with and without a precomposed suffix; alias to the same asset.
 app.get('/apple-touch-icon-precomposed.png', (c) => c.redirect('/apple-touch-icon.png', 301));
 
-app.get('/', (c) => {
+app.get('/', async (c) => {
   const version = c.env.GOVERNOR_VERSION ?? 'dev';
-  // Content-negotiated: browsers get a tiny landing page, API clients get JSON.
+  // Content-negotiated: browsers get HTML, API clients get JSON.
   const accept = c.req.header('accept') ?? '';
-  if (accept.includes('text/html')) {
-    return c.html(
-      `<!doctype html><html lang="en"><meta charset="utf-8">` +
-        `<title>Governor</title><link rel="icon" href="/favicon.svg" type="image/svg+xml">` +
-        `<link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
-        `<meta name="viewport" content="width=device-width,initial-scale=1">` +
-        `<style>html{font:15px/1.55 ui-sans-serif,-apple-system,system-ui,sans-serif;` +
-        `color:#1a1a1a;background:#fafaf7}@media(prefers-color-scheme:dark){html{color:#e8e6df;background:#111418}}` +
-        `body{max-width:560px;margin:14vh auto;padding:0 24px}h1{display:flex;align-items:center;gap:14px;font-size:28px;font-weight:600;margin:0 0 8px;letter-spacing:-.01em}` +
-        `h1 svg{flex:0 0 auto}p{opacity:.75;margin:0 0 8px}code{font:13px ui-monospace,Menlo,monospace;background:rgba(127,127,127,.12);padding:2px 6px;border-radius:4px}` +
-        `a{color:inherit}</style>` +
-        `<body><h1>` +
-        `<svg width="32" height="32" viewBox="0 0 64 64"><circle cx="32" cy="32" r="25" fill="none" stroke="currentColor" stroke-width="5"/>` +
-        `<path d="M19 33 L28.5 43 L46 22" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` +
-        `Governor</h1>` +
-        `<p>Reference attestation server, version <code>${version}</code>. ` +
-        `Authenticated API under <code>/v1</code>.</p>` +
-        `<p>Source &amp; spec at <a href="https://github.com/makemore/governor">github.com/makemore/governor</a>.</p>`,
-    );
+  if (!accept.includes('text/html')) {
+    return c.json({ name: 'governor', version });
   }
-  return c.json({ name: 'governor', version });
+  if (isPublicEnabled(c.env)) {
+    const cfg = readPublicConfig(c.env);
+    const [subjects, activity] = await Promise.all([
+      loadRecentSubjects(c.env, cfg.subjectLimit),
+      loadRecentActivity(c.env, cfg.activityLimit),
+    ]);
+    return c.html(renderPublicPage(cfg, subjects, activity, Date.now()));
+  }
+  return c.html(
+    `<!doctype html><html lang="en"><meta charset="utf-8">` +
+      `<title>Governor</title><link rel="icon" href="/favicon.svg" type="image/svg+xml">` +
+      `<link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
+      `<meta name="viewport" content="width=device-width,initial-scale=1">` +
+      `<style>html{font:15px/1.55 ui-sans-serif,-apple-system,system-ui,sans-serif;` +
+      `color:#1a1a1a;background:#fafaf7}@media(prefers-color-scheme:dark){html{color:#e8e6df;background:#111418}}` +
+      `body{max-width:560px;margin:14vh auto;padding:0 24px}h1{display:flex;align-items:center;gap:14px;font-size:28px;font-weight:600;margin:0 0 8px;letter-spacing:-.01em}` +
+      `h1 svg{flex:0 0 auto}p{opacity:.75;margin:0 0 8px}code{font:13px ui-monospace,Menlo,monospace;background:rgba(127,127,127,.12);padding:2px 6px;border-radius:4px}` +
+      `a{color:inherit}</style>` +
+      `<body><h1>` +
+      `<svg width="32" height="32" viewBox="0 0 64 64"><circle cx="32" cy="32" r="25" fill="none" stroke="currentColor" stroke-width="5"/>` +
+      `<path d="M19 33 L28.5 43 L46 22" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` +
+      `Governor</h1>` +
+      `<p>Reference attestation server, version <code>${version}</code>. ` +
+      `Authenticated API under <code>/v1</code>.</p>` +
+      `<p>Source &amp; spec at <a href="https://github.com/makemore/governor">github.com/makemore/governor</a>.</p>`,
+  );
 });
 
 const v1 = new Hono<App>();

@@ -25,3 +25,17 @@ migrations_dir = "migrations"
 # Do NOT put real values here.
 [vars]
 GOVERNOR_VERSION = "0.0.1"
+
+# Public read-only status view. Off by default; the worker root serves a
+# tiny "this is a Governor server" page and JSON to API clients. Set
+# GOVERNOR_PUBLIC_ENABLED = "true" to instead serve a branded, themeable
+# read-only view of recent attestation activity at the root URL.
+#
+# GOVERNOR_PUBLIC_ENABLED          = "true"
+# GOVERNOR_BRAND_NAME              = "Acme Robotics"
+# GOVERNOR_BRAND_ACCENT            = "#1f6f5c"     # any CSS colour
+# GOVERNOR_BRAND_LOGO_URL          = "https://acme.example/logo.png"
+# GOVERNOR_PUBLIC_TITLE            = "Release sign-off"
+# GOVERNOR_PUBLIC_TAGLINE          = "Who approved which release, and when."
+# GOVERNOR_PUBLIC_HIDE_ACTOR_NAMES = "true"        # show role only
+# GOVERNOR_PUBLIC_HIDE_NOTES       = "true"        # suppress attestation notes
