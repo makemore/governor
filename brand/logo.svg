@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" role="img" aria-label="Governor">
+  <title>Governor</title>
+  <!-- Mark -->
+  <g transform="translate(8 8)">
+    <circle cx="32" cy="32" r="25" fill="none" stroke="currentColor" stroke-width="5"/>
+    <path d="M19 33 L28.5 43 L46 22" fill="none" stroke="currentColor"
+          stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- Wordmark. Convert to outlines before external distribution. -->
+  <text x="90" y="52"
+        font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
+        font-size="42" font-weight="600" letter-spacing="-1"
+        fill="currentColor">Governor</text>
+</svg>

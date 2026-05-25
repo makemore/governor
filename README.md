@@ -1,4 +1,6 @@
-# Governor
+<p align="left">
+  <img src="./brand/logo.svg" alt="Governor" width="260">
+</p>
 
 An append-only, multi-party attestation log with a rule evaluator over it.
 Designed to be embedded, self-hosted, or consumed as a hosted service.

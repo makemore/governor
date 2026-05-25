@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Governor — mark candidates</title>
+<style>
+  :root { --fg: #1a1a1a; --bg: #fafaf7; --muted: #6b6b6b; --rule: #e5e5e0; }
+  * { box-sizing: border-box; }
+  body { font: 14px/1.5 ui-sans-serif, -apple-system, system-ui, sans-serif;
+         margin: 0; color: var(--fg); background: var(--bg); }
+  h1 { font-size: 18px; font-weight: 600; margin: 32px 0 4px; }
+  p.lead { color: var(--muted); margin: 0 0 24px; }
+  .stripe { padding: 32px 40px; border-top: 1px solid var(--rule); }
+  .stripe.light { background: #ffffff; color: #111; }
+  .stripe.dark  { background: #111418; color: #e8e6df; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 16px; }
+  .card { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px;
+          border: 1px solid currentColor; border-radius: 8px; opacity: .98; }
+  .card.dark  { border-color: #2a2f36; }
+  .label { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; opacity: .65; }
+  .sizes { display: flex; align-items: end; gap: 20px; }
+  .sizes .slot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .sizes .px { font-size: 10px; opacity: .55; }
+  .wordmark { display: flex; align-items: center; gap: 12px;
+              font: 600 22px/1 ui-sans-serif, -apple-system, sans-serif; letter-spacing: -0.01em; }
+  .wordmark .sub { font: 400 12px/1 ui-sans-serif, -apple-system, sans-serif;
+                   letter-spacing: .12em; text-transform: uppercase; opacity: .55; margin-left: 8px; }
+  svg { display: block; }
+  header { padding: 32px 40px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Governor — three mark candidates</h1>
+  <p class="lead">Same three SVGs on a light and a dark surface, at 16 / 24 / 48 / 96 px,
+                  plus a wordmark line. Each mark uses <code>currentColor</code> so a single
+                  file works for any theme.</p>
+</header>
+
+<section class="stripe light">
+  <div class="grid">
+    <!-- GATE -->
+    <div class="card" style="color:#111;">
+      <div class="label">1 · Gate / Portcullis</div>
+      <div class="sizes">
+        <div class="slot"><svg width="16" height="16" viewBox="0 0 64 64"><g fill="currentColor"><rect x="8" y="12" width="48" height="6"/><rect x="8" y="12" width="6" height="44"/><rect x="50" y="12" width="6" height="44"/><rect x="22" y="22" width="3" height="22"/><rect x="30.5" y="22" width="3" height="22"/><rect x="39" y="22" width="3" height="22"/></g></svg><span class="px">16</span></div>
+        <div class="slot"><svg width="24" height="24" viewBox="0 0 64 64"><g fill="currentColor"><rect x="8" y="12" width="48" height="6"/><rect x="8" y="12" width="6" height="44"/><rect x="50" y="12" width="6" height="44"/><rect x="22" y="22" width="3" height="22"/><rect x="30.5" y="22" width="3" height="22"/><rect x="39" y="22" width="3" height="22"/></g></svg><span class="px">24</span></div>
+        <div class="slot"><svg width="48" height="48" viewBox="0 0 64 64"><g fill="currentColor"><rect x="8" y="12" width="48" height="6"/><rect x="8" y="12" width="6" height="44"/><rect x="50" y="12" width="6" height="44"/><rect x="22" y="22" width="3" height="22"/><rect x="30.5" y="22" width="3" height="22"/><rect x="39" y="22" width="3" height="22"/></g></svg><span class="px">48</span></div>
+        <div class="slot"><svg width="96" height="96" viewBox="0 0 64 64"><g fill="currentColor"><rect x="8" y="12" width="48" height="6"/><rect x="8" y="12" width="6" height="44"/><rect x="50" y="12" width="6" height="44"/><rect x="22" y="22" width="3" height="22"/><rect x="30.5" y="22" width="3" height="22"/><rect x="39" y="22" width="3" height="22"/></g></svg><span class="px">96</span></div>
+      </div>
+      <div class="wordmark"><svg width="28" height="28" viewBox="0 0 64 64"><g fill="currentColor"><rect x="8" y="12" width="48" height="6"/><rect x="8" y="12" width="6" height="44"/><rect x="50" y="12" width="6" height="44"/><rect x="22" y="22" width="3" height="22"/><rect x="30.5" y="22" width="3" height="22"/><rect x="39" y="22" width="3" height="22"/></g></svg>Governor<span class="sub">attestation log</span></div>
+    </div>
+
+    <!-- SEAL -->
+    <div class="card" style="color:#111;">
+      <div class="label">2 · Seal / Wax stamp</div>
+      <div class="sizes">
+        <div class="slot"><svg width="16" height="16" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="4"/><g fill="currentColor"><circle cx="32" cy="10" r="2.6"/><circle cx="51.05" cy="21" r="2.6"/><circle cx="51.05" cy="43" r="2.6"/><circle cx="32" cy="54" r="2.6"/><circle cx="12.95" cy="43" r="2.6"/><circle cx="12.95" cy="21" r="2.6"/></g><path d="M22 32 L29 39 L43 25" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="px">16</span></div>
+        <div class="slot"><svg width="24" height="24" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="4"/><g fill="currentColor"><circle cx="32" cy="10" r="2.6"/><circle cx="51.05" cy="21" r="2.6"/><circle cx="51.05" cy="43" r="2.6"/><circle cx="32" cy="54" r="2.6"/><circle cx="12.95" cy="43" r="2.6"/><circle cx="12.95" cy="21" r="2.6"/></g><path d="M22 32 L29 39 L43 25" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="px">24</span></div>
+        <div class="slot"><svg width="48" height="48" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="4"/><g fill="currentColor"><circle cx="32" cy="10" r="2.6"/><circle cx="51.05" cy="21" r="2.6"/><circle cx="51.05" cy="43" r="2.6"/><circle cx="32" cy="54" r="2.6"/><circle cx="12.95" cy="43" r="2.6"/><circle cx="12.95" cy="21" r="2.6"/></g><path d="M22 32 L29 39 L43 25" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="px">48</span></div>
+        <div class="slot"><svg width="96" height="96" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="4"/><g fill="currentColor"><circle cx="32" cy="10" r="2.6"/><circle cx="51.05" cy="21" r="2.6"/><circle cx="51.05" cy="43" r="2.6"/><circle cx="32" cy="54" r="2.6"/><circle cx="12.95" cy="43" r="2.6"/><circle cx="12.95" cy="21" r="2.6"/></g><path d="M22 32 L29 39 L43 25" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="px">96</span></div>
+      </div>
+      <div class="wordmark"><svg width="28" height="28" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="4"/><g fill="currentColor"><circle cx="32" cy="10" r="2.6"/><circle cx="51.05" cy="21" r="2.6"/><circle cx="51.05" cy="43" r="2.6"/><circle cx="32" cy="54" r="2.6"/><circle cx="12.95" cy="43" r="2.6"/><circle cx="12.95" cy="21" r="2.6"/></g><path d="M22 32 L29 39 L43 25" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>Governor<span class="sub">attestation log</span></div>
+    </div>
+
+    <!-- ROSETTE -->
+    <div class="card" style="color:#111;">
+      <div class="label">3 · Rosette / Multi-signer</div>
+      <div class="sizes">
+        <div class="slot"><svg width="16" height="16" viewBox="0 0 64 64"><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="14" y1="14" x2="32" y2="32"/><line x1="50" y1="14" x2="32" y2="32"/><line x1="14" y1="50" x2="32" y2="32"/><line x1="50" y1="50" x2="32" y2="32"/></g><g fill="currentColor"><circle cx="14" cy="14" r="5"/><circle cx="50" cy="14" r="5"/><circle cx="14" cy="50" r="5"/><circle cx="50" cy="50" r="5"/><circle cx="32" cy="32" r="7"/></g></svg><span class="px">16</span></div>
+        <div class="slot"><svg width="24" height="24" viewBox="0 0 64 64"><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="14" y1="14" x2="32" y2="32"/><line x1="50" y1="14" x2="32" y2="32"/><line x1="14" y1="50" x2="32" y2="32"/><line x1="50" y1="50" x2="32" y2="32"/></g><g fill="currentColor"><circle cx="14" cy="14" r="5"/><circle cx="50" cy="14" r="5"/><circle cx="14" cy="50" r="5"/><circle cx="50" cy="50" r="5"/><circle cx="32" cy="32" r="7"/></g></svg><span class="px">24</span></div>
+        <div class="slot"><svg width="48" height="48" viewBox="0 0 64 64"><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="14" y1="14" x2="32" y2="32"/><line x1="50" y1="14" x2="32" y2="32"/><line x1="14" y1="50" x2="32" y2="32"/><line x1="50" y1="50" x2="32" y2="32"/></g><g fill="currentColor"><circle cx="14" cy="14" r="5"/><circle cx="50" cy="14" r="5"/><circle cx="14" cy="50" r="5"/><circle cx="50" cy="50" r="5"/><circle cx="32" cy="32" r="7"/></g></svg><span class="px">48</span></div>
+        <div class="slot"><svg width="96" height="96" viewBox="0 0 64 64"><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="14" y1="14" x2="32" y2="32"/><line x1="50" y1="14" x2="32" y2="32"/><line x1="14" y1="50" x2="32" y2="32"/><line x1="50" y1="50" x2="32" y2="32"/></g><g fill="currentColor"><circle cx="14" cy="14" r="5"/><circle cx="50" cy="14" r="5"/><circle cx="14" cy="50" r="5"/><circle cx="50" cy="50" r="5"/><circle cx="32" cy="32" r="7"/></g></svg><span class="px">96</span></div>
+      </div>
+      <div class="wordmark"><svg width="28" height="28" viewBox="0 0 64 64"><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="14" y1="14" x2="32" y2="32"/><line x1="50" y1="14" x2="32" y2="32"/><line x1="14" y1="50" x2="32" y2="32"/><line x1="50" y1="50" x2="32" y2="32"/></g><g fill="currentColor"><circle cx="14" cy="14" r="5"/><circle cx="50" cy="14" r="5"/><circle cx="14" cy="50" r="5"/><circle cx="50" cy="50" r="5"/><circle cx="32" cy="32" r="7"/></g></svg>Governor<span class="sub">attestation log</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="stripe dark" id="dark"></section>
+
+<script>
+  // Mirror the light stripe into the dark one so we don't repeat ~100 lines of SVG.
+  document.getElementById('dark').innerHTML =
+    document.querySelector('.stripe.light').innerHTML
+      .replaceAll('color:#111', 'color:#e8e6df');
+</script>
+
+</body>
+</html>

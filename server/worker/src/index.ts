@@ -13,7 +13,43 @@ type App = { Bindings: Env; Variables: { actor: AuthedActor } };
 
 const app = new Hono<App>();
 
-app.get('/', (c) => c.json({ name: 'governor', version: c.env.GOVERNOR_VERSION ?? 'dev' }));
+const FAVICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
+  '<circle cx="32" cy="32" r="25" fill="none" stroke="#111" stroke-width="6"/>' +
+  '<path d="M19 33 L28.5 43 L46 22" fill="none" stroke="#111" stroke-width="7" ' +
+  'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+app.get('/favicon.svg', (c) => {
+  return new Response(FAVICON_SVG, {
+    headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' },
+  });
+});
+
+app.get('/', (c) => {
+  const version = c.env.GOVERNOR_VERSION ?? 'dev';
+  // Content-negotiated: browsers get a tiny landing page, API clients get JSON.
+  const accept = c.req.header('accept') ?? '';
+  if (accept.includes('text/html')) {
+    return c.html(
+      `<!doctype html><html lang="en"><meta charset="utf-8">` +
+        `<title>Governor</title><link rel="icon" href="/favicon.svg" type="image/svg+xml">` +
+        `<meta name="viewport" content="width=device-width,initial-scale=1">` +
+        `<style>html{font:15px/1.55 ui-sans-serif,-apple-system,system-ui,sans-serif;` +
+        `color:#1a1a1a;background:#fafaf7}@media(prefers-color-scheme:dark){html{color:#e8e6df;background:#111418}}` +
+        `body{max-width:560px;margin:14vh auto;padding:0 24px}h1{display:flex;align-items:center;gap:14px;font-size:28px;font-weight:600;margin:0 0 8px;letter-spacing:-.01em}` +
+        `h1 svg{flex:0 0 auto}p{opacity:.75;margin:0 0 8px}code{font:13px ui-monospace,Menlo,monospace;background:rgba(127,127,127,.12);padding:2px 6px;border-radius:4px}` +
+        `a{color:inherit}</style>` +
+        `<body><h1>` +
+        `<svg width="32" height="32" viewBox="0 0 64 64"><circle cx="32" cy="32" r="25" fill="none" stroke="currentColor" stroke-width="5"/>` +
+        `<path d="M19 33 L28.5 43 L46 22" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` +
+        `Governor</h1>` +
+        `<p>Reference attestation server, version <code>${version}</code>. ` +
+        `Authenticated API under <code>/v1</code>.</p>` +
+        `<p>Source &amp; spec at <a href="https://github.com/makemore/governor">github.com/makemore/governor</a>.</p>`,
+    );
+  }
+  return c.json({ name: 'governor', version });
+});
 
 const v1 = new Hono<App>();
 v1.use('*', auth);
