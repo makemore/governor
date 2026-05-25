@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://governor.dev/spec/v1/envelope.schema.json",
+  "title": "Governor Attestation Envelope (v1, draft)",
+  "description": "Working sketch of the on-the-wire attestation envelope. The intent is for this payload to be embeddable inside the 'predicate' field of an in-toto ITE-6 Statement (https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md) so that Governor attestations can be co-signed and recorded on Sigstore Rekor without translation. This is a goal; the alignment has not yet been finalised.",
+  "type": "object",
+  "required": ["version", "subject", "item_key", "actor", "attested_at"],
+  "properties": {
+    "version": {
+      "const": "governor.envelope/v1"
+    },
+    "subject": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "external_id": { "type": "string" },
+        "kind": { "type": "string" }
+      }
+    },
+    "item_key": { "type": "string", "minLength": 1 },
+    "actor": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "type": "string", "enum": ["human", "agent", "service"] },
+        "display_name": { "type": "string" }
+      }
+    },
+    "attested_at": { "type": "string", "format": "date-time" },
+    "note": { "type": "string" },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["url", "hash", "inline"] },
+          "url": { "type": "string", "format": "uri" },
+          "content_hash": { "type": "string" },
+          "media_type": { "type": "string" },
+          "inline_metadata": { "type": "object" }
+        }
+      }
+    }
+  }
+}

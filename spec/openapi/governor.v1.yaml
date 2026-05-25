@@ -1,0 +1,319 @@
+openapi: 3.1.0
+info:
+  title: Governor API
+  version: 0.1.0
+  description: |
+    Minimum-viable HTTP surface for a Governor attestation server. Implementations
+    MUST conform to this contract; clients depending only on this spec MUST work
+    against any conformant implementation.
+
+    Auth model: opaque bearer tokens in `Authorization: Bearer <token>`. A token
+    binds the request to a single Actor. The first actor in an org is created
+    out-of-band by the server's bootstrap process.
+  license:
+    name: Apache-2.0
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: governor.example.workers.dev
+security:
+  - bearerAuth: []
+paths:
+  /v1/whoami:
+    get:
+      summary: Return the actor bound to the current token.
+      operationId: whoami
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Actor' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/actors:
+    post:
+      summary: Register a new actor. Requires the `admin` role.
+      operationId: createActor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActorCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Actor' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/actors/{actor_id}/tokens:
+    post:
+      summary: Mint a new bearer token for an actor. Admin or self.
+      operationId: mintToken
+      parameters:
+        - { in: path, name: actor_id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '201':
+          description: |
+            Returned ONCE in plaintext. Only a salted hash is persisted server-side.
+            Re-mint to recover a lost token; previous token is invalidated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, actor_id, created_at]
+                properties:
+                  token:      { type: string, description: "Opaque bearer; show only once." }
+                  actor_id:   { type: string, format: uuid }
+                  created_at: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/runs:
+    post:
+      summary: Start a checklist run.
+      operationId: createRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RunCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Run' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Invalid' }
+
+  /v1/runs/{run_id}:
+    get:
+      summary: Read a run with its items and attestations.
+      operationId: getRun
+      parameters:
+        - { in: path, name: run_id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Run' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/runs/{run_id}/attestations:
+    post:
+      summary: Append an attestation to a run item. Append-only; never updates.
+      operationId: createAttestation
+      parameters:
+        - { in: path, name: run_id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttestationCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Attestation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Invalid' }
+
+  /v1/runs/{run_id}/gate:
+    get:
+      summary: Evaluate rules over current attestations and return the decision.
+      operationId: gate
+      parameters:
+        - { in: path, name: run_id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GateDecision' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Opaque token issued by `POST /v1/actors/{id}/tokens`.
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Authenticated actor lacks the required role.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource does not exist.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Invalid:
+      description: Request body failed validation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:   { type: string, description: "Machine-readable code, kebab-case." }
+        message: { type: string, description: "Human-readable detail." }
+        detail:  { type: object, additionalProperties: true }
+
+    Actor:
+      type: object
+      required: [id, kind, display_name, roles, created_at]
+      properties:
+        id:           { type: string, format: uuid }
+        kind:         { type: string, enum: [human, agent, service] }
+        display_name: { type: string }
+        roles:
+          type: array
+          items: { type: string, minLength: 1 }
+        created_at:   { type: string, format: date-time }
+
+    ActorCreate:
+      type: object
+      required: [kind, display_name]
+      properties:
+        kind:         { type: string, enum: [human, agent, service] }
+        display_name: { type: string, minLength: 1 }
+        roles:
+          type: array
+          default: []
+          items: { type: string, minLength: 1 }
+
+    ChecklistItemDef:
+      type: object
+      required: [key, rule]
+      properties:
+        key:         { type: string, minLength: 1, description: "Stable identifier within the run." }
+        description: { type: string }
+        rule:
+          description: "Value conforming to the rule.v1 JSON Schema."
+          type: object
+
+    ChecklistDef:
+      type: object
+      required: [key, items]
+      properties:
+        key:    { type: string, minLength: 1 }
+        title:  { type: string }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ChecklistItemDef' }
+
+    RunSubject:
+      type: object
+      required: [id]
+      properties:
+        id:    { type: string, minLength: 1, description: "External identifier of the thing under attestation." }
+        label: { type: string }
+        kind:  { type: string, description: "e.g. release, deploy, model-version, dataset." }
+
+    RunCreate:
+      type: object
+      required: [checklist, subject]
+      properties:
+        checklist: { $ref: '#/components/schemas/ChecklistDef' }
+        subject:   { $ref: '#/components/schemas/RunSubject' }
+
+    Run:
+      type: object
+      required: [id, subject, items, created_at]
+      properties:
+        id:         { type: string, format: uuid }
+        subject:    { $ref: '#/components/schemas/RunSubject' }
+        created_at: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RunItem' }
+
+    RunItem:
+      type: object
+      required: [key, rule, attestations]
+      properties:
+        key:          { type: string }
+        description:  { type: string }
+        rule:         { type: object }
+        attestations:
+          type: array
+          items: { $ref: '#/components/schemas/Attestation' }
+
+    AttestationCreate:
+      type: object
+      required: [item_key]
+      properties:
+        item_key: { type: string, minLength: 1 }
+        note:     { type: string }
+        evidence:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:         { type: string, enum: [url, hash, inline] }
+              url:          { type: string, format: uri }
+              content_hash: { type: string }
+              media_type:   { type: string }
+
+    Attestation:
+      type: object
+      required: [id, run_id, item_key, actor, attested_at]
+      properties:
+        id:          { type: string, format: uuid }
+        run_id:      { type: string, format: uuid }
+        item_key:    { type: string }
+        actor:
+          type: object
+          required: [id, kind, display_name]
+          properties:
+            id:           { type: string, format: uuid }
+            kind:         { type: string, enum: [human, agent, service] }
+            display_name: { type: string }
+        attested_at: { type: string, format: date-time }
+        note:        { type: string }
+
+    GateDecision:
+      type: object
+      required: [decision, items, summary]
+      properties:
+        decision:
+          type: string
+          enum: [allow, deny]
+        summary:
+          type: object
+          required: [items_total, items_satisfied]
+          properties:
+            items_total:     { type: integer, minimum: 0 }
+            items_satisfied: { type: integer, minimum: 0 }
+        items:
+          type: array
+          items:
+            type: object
+            required: [key, satisfied]
+            properties:
+              key:       { type: string }
+              satisfied: { type: boolean }
+              reason:    { type: string }

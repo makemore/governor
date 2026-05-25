@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://governor.dev/spec/v1/rule.schema.json",
+  "title": "Governor Rule (v1)",
+  "description": "Declarative rule that determines whether a checklist item is satisfied given a set of attestations. Combinators may be nested arbitrarily; leaves match against the set of attesters or their roles.",
+  "$ref": "#/$defs/rule",
+  "$defs": {
+    "rule": {
+      "oneOf": [
+        { "$ref": "#/$defs/anyActor" },
+        { "$ref": "#/$defs/actorWithRole" },
+        { "$ref": "#/$defs/actorWithKind" },
+        { "$ref": "#/$defs/actorIs" },
+        { "$ref": "#/$defs/allOf" },
+        { "$ref": "#/$defs/anyOf" },
+        { "$ref": "#/$defs/nOf" }
+      ]
+    },
+    "anyActor": {
+      "description": "Satisfied by any attestation from any actor.",
+      "type": "object",
+      "properties": { "actor": { "const": true } },
+      "required": ["actor"],
+      "additionalProperties": false
+    },
+    "actorWithRole": {
+      "description": "Satisfied if at least one attester holds the named role.",
+      "type": "object",
+      "properties": { "actor_with_role": { "type": "string", "minLength": 1 } },
+      "required": ["actor_with_role"],
+      "additionalProperties": false
+    },
+    "actorWithKind": {
+      "description": "Satisfied if at least one attester is of the named kind (e.g. 'human', 'agent', 'service').",
+      "type": "object",
+      "properties": { "actor_with_kind": { "type": "string", "minLength": 1 } },
+      "required": ["actor_with_kind"],
+      "additionalProperties": false
+    },
+    "actorIs": {
+      "description": "Satisfied only by an attestation from the named actor UUID.",
+      "type": "object",
+      "properties": {
+        "actor_is": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        }
+      },
+      "required": ["actor_is"],
+      "additionalProperties": false
+    },
+    "allOf": {
+      "type": "object",
+      "properties": {
+        "all_of": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/rule" }
+        }
+      },
+      "required": ["all_of"],
+      "additionalProperties": false
+    },
+    "anyOf": {
+      "type": "object",
+      "properties": {
+        "any_of": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/rule" }
+        }
+      },
+      "required": ["any_of"],
+      "additionalProperties": false
+    },
+    "nOf": {
+      "description": "Satisfied when at least 'count' of the listed sub-rules are satisfied.",
+      "type": "object",
+      "properties": {
+        "n_of": {
+          "type": "object",
+          "properties": {
+            "count": { "type": "integer", "minimum": 1 },
+            "of": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/rule" }
+            }
+          },
+          "required": ["count", "of"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["n_of"],
+      "additionalProperties": false
+    }
+  }
+}

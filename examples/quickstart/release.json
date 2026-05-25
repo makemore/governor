@@ -1,0 +1,47 @@
+{
+  "checklist": {
+    "key": "release-v1",
+    "title": "Release readiness checklist",
+    "items": [
+      {
+        "key": "tests-green",
+        "description": "CI test suite passes on the release commit.",
+        "rule": { "actor_with_role": "ci" }
+      },
+      {
+        "key": "code-review",
+        "description": "At least one human reviewer signs off on the diff.",
+        "rule": {
+          "all_of": [
+            { "actor_with_kind": "human" },
+            { "actor_with_role": "reviewer" }
+          ]
+        }
+      },
+      {
+        "key": "security-review",
+        "description": "Security officer signs off on dependency + secret changes.",
+        "rule": { "actor_with_role": "security-officer" }
+      },
+      {
+        "key": "two-managers",
+        "description": "Any two of release-manager / engineering-manager / cto must approve.",
+        "rule": {
+          "n_of": {
+            "count": 2,
+            "of": [
+              { "actor_with_role": "release-manager" },
+              { "actor_with_role": "engineering-manager" },
+              { "actor_with_role": "cto" }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "subject": {
+    "id": "01999999-9999-7999-8999-999999999999",
+    "label": "myapp v1.4.0",
+    "kind": "release"
+  }
+}

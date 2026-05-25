@@ -1,0 +1,27 @@
+# Cloudflare Worker config for the Governor reference server.
+#
+# To deploy your own instance:
+#   1. npm install
+#   2. npm run db:create            # prints a `database_id` -- paste it below
+#   3. npm run db:migrate:remote    # applies migrations/0001_init.sql to D1
+#   4. wrangler secret put GOVERNOR_BOOTSTRAP_TOKEN
+#      (provide a long random string; this token has admin powers, treat as root)
+#   5. npm run deploy
+
+name = "governor"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Local dev: `wrangler dev` uses a SQLite file shadow of D1.
+# Remote: paste the database_id printed by `npm run db:create`.
+[[d1_databases]]
+binding = "DB"
+database_name = "governor"
+database_id = "REPLACE_WITH_OUTPUT_OF_db:create"
+migrations_dir = "migrations"
+
+# Set with `wrangler secret put GOVERNOR_BOOTSTRAP_TOKEN`.
+# Do NOT put real values here.
+[vars]
+GOVERNOR_VERSION = "0.0.1"

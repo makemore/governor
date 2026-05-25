@@ -1,0 +1,153 @@
+{
+  "$schema": "../schemas/rule.v1.json",
+  "version": 1,
+  "description": "Language-portable behavioural vectors for the Governor rule evaluator. Every conformant implementation of governor-core MUST produce 'expected' for each case when evaluating 'rule' against 'attestations' with 'actor_roles'. These vectors are loaded by both governor/core/python/tests and governor/core/ts/tests.",
+  "cases": [
+    {
+      "id": "empty-dict-unsatisfied",
+      "rule": {},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {},
+      "expected": false
+    },
+    {
+      "id": "null-rule-unsatisfied",
+      "rule": null,
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {},
+      "expected": false
+    },
+    {
+      "id": "unknown-key-unsatisfied",
+      "rule": {"nonsense": true},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {},
+      "expected": false
+    },
+    {
+      "id": "any-actor-with-attestations",
+      "rule": {"actor": true},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {},
+      "expected": true
+    },
+    {
+      "id": "any-actor-without-attestations",
+      "rule": {"actor": true},
+      "attestations": [],
+      "actor_roles": {},
+      "expected": false
+    },
+    {
+      "id": "actor-with-role-hit",
+      "rule": {"actor_with_role": "reviewer"},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {"a1": ["reviewer", "release-manager"]},
+      "expected": true
+    },
+    {
+      "id": "actor-with-role-miss",
+      "rule": {"actor_with_role": "release-manager"},
+      "attestations": [{"actor_id": "a2", "actor_kind": "agent"}],
+      "actor_roles": {"a1": ["reviewer", "release-manager"], "a2": ["qa"]},
+      "expected": false
+    },
+    {
+      "id": "actor-with-kind-human-hit",
+      "rule": {"actor_with_kind": "human"},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}, {"actor_id": "a2", "actor_kind": "agent"}],
+      "actor_roles": {},
+      "expected": true
+    },
+    {
+      "id": "actor-with-kind-service-miss",
+      "rule": {"actor_with_kind": "service"},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}, {"actor_id": "a2", "actor_kind": "agent"}],
+      "actor_roles": {},
+      "expected": false
+    },
+    {
+      "id": "actor-is-hit",
+      "rule": {"actor_is": "a1"},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {},
+      "expected": true
+    },
+    {
+      "id": "actor-is-miss",
+      "rule": {"actor_is": "a99"},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {},
+      "expected": false
+    },
+    {
+      "id": "all-of-satisfied",
+      "rule": {"all_of": [{"actor_with_kind": "human"}, {"actor_with_role": "reviewer"}]},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {"a1": ["reviewer", "release-manager"]},
+      "expected": true
+    },
+    {
+      "id": "all-of-unsatisfied",
+      "rule": {"all_of": [{"actor_with_kind": "human"}, {"actor_with_role": "reviewer"}]},
+      "attestations": [{"actor_id": "a2", "actor_kind": "agent"}],
+      "actor_roles": {"a2": ["qa"]},
+      "expected": false
+    },
+    {
+      "id": "any-of-satisfied",
+      "rule": {"any_of": [{"actor_with_role": "compliance-officer"}, {"actor_with_role": "qa"}]},
+      "attestations": [{"actor_id": "a2", "actor_kind": "agent"}],
+      "actor_roles": {"a2": ["qa"]},
+      "expected": true
+    },
+    {
+      "id": "any-of-unsatisfied",
+      "rule": {"any_of": [{"actor_with_role": "compliance-officer"}, {"actor_with_role": "qa"}]},
+      "attestations": [{"actor_id": "a3", "actor_kind": "service"}],
+      "actor_roles": {},
+      "expected": false
+    },
+    {
+      "id": "n-of-met-by-single-actor-with-multiple-roles",
+      "rule": {"n_of": {"count": 2, "of": [
+        {"actor_with_role": "reviewer"},
+        {"actor_with_role": "release-manager"},
+        {"actor_with_role": "security-officer"}
+      ]}},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {"a1": ["reviewer", "release-manager"]},
+      "expected": true
+    },
+    {
+      "id": "n-of-unsatisfied",
+      "rule": {"n_of": {"count": 2, "of": [
+        {"actor_with_role": "reviewer"},
+        {"actor_with_role": "security-officer"}
+      ]}},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {"a1": ["reviewer", "release-manager"]},
+      "expected": false
+    },
+    {
+      "id": "n-of-count-one-equivalent-to-any-of",
+      "rule": {"n_of": {"count": 1, "of": [
+        {"actor_with_role": "qa"},
+        {"actor_with_role": "release-manager"}
+      ]}},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {"a1": ["reviewer", "release-manager"]},
+      "expected": true
+    },
+    {
+      "id": "nested-all-of-inside-n-of",
+      "rule": {"n_of": {"count": 1, "of": [
+        {"all_of": [{"actor_with_kind": "human"}, {"actor_with_role": "release-manager"}]},
+        {"actor_with_role": "security-officer"}
+      ]}},
+      "attestations": [{"actor_id": "a1", "actor_kind": "human"}],
+      "actor_roles": {"a1": ["release-manager"]},
+      "expected": true
+    }
+  ]
+}

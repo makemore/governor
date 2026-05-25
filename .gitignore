@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+htmlcov/
+build/
+dist/
+.venv/
+venv/
+
+# Go (reserved for future governor/core/go, governor/cli/go)
+*.exe
+*.test
+*.out
+go.work.sum
+vendor/
+
+# Node (reserved for future governor/sdks/typescript)
+node_modules/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local env
+.env
+.env.local

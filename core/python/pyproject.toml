@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "governor-core"
+version = "0.0.1"
+description = "Pure-Python evaluator for the Governor attestation rule DSL."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "Governor contributors" }]
+keywords = ["attestation", "policy", "signoff", "supply-chain", "governor"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/governor_core"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

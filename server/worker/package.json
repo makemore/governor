@@ -1,0 +1,25 @@
+{
+  "name": "@governor/worker",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Reference Governor server implementation on Cloudflare Workers + D1.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create governor",
+    "db:migrate:local": "wrangler d1 migrations apply governor --local",
+    "db:migrate:remote": "wrangler d1 migrations apply governor --remote",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@governor/core": "file:../../core/ts",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240924.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^3.78.0"
+  }
+}
