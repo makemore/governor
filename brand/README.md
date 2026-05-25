@@ -20,6 +20,7 @@ need to see the brand and know what it is for in under a second.
 | [`preview-chosen.html`](./preview-chosen.html) | Open in a browser to see all variants at multiple sizes on light + dark |
 | [`preview.html`](./preview.html) | Side-by-side comparison of the three original concepts (gate, seal, rosette). Kept for history |
 | `mark-gate.svg`, `mark-rosette.svg` | The two unchosen concepts. Kept for history; do not use |
+| [`png/`](./png/) | Pre-rendered PNG variants at 16/32/48/180/192/512/1024 px plus `apple-touch-icon.png` (alias of 180). Committed so consumers don't need librsvg. Regenerate via the one-liner below if the mark changes. |
 
 ## Usage rules
 
@@ -46,23 +47,30 @@ accents, posters, or marketing, use one of these:
 
 The CLI styling uses these for its `ALLOW` and `DENY` banners.
 
-## Generating PNG variants
+## Regenerating the PNG set
 
-If you want PNG copies for legacy environments (older email clients,
-some social cards, app-store listings), the SVGs convert with one
-of the following:
+The `png/` directory is committed, but if the mark changes, regenerate
+all variants from `favicon.svg` with one of:
 
 ```sh
 # librsvg (recommended; brew install librsvg)
-for s in 16 32 48 180 512 1024; do
-  rsvg-convert -w $s -h $s favicon.svg -o favicon-${s}.png
+cd governor/brand
+for s in 16 32 48 180 192 512 1024; do
+  rsvg-convert -w $s -h $s favicon.svg -o png/favicon-${s}.png
 done
+cp png/favicon-180.png png/apple-touch-icon.png
 
 # ImageMagick alternative
-for s in 16 32 48 180 512 1024; do
-  magick -background none -resize ${s}x${s} favicon.svg favicon-${s}.png
+for s in 16 32 48 180 192 512 1024; do
+  magick -background none -resize ${s}x${s} favicon.svg png/favicon-${s}.png
 done
 ```
 
-Neither tool is shipped with this repo; the SVG sources are the
-canonical assets. PNGs go in `./png/` if generated (gitignored).
+The SVG sources are the canonical assets; the PNGs are derived. If
+you change the mark, regenerate the PNG set *and* re-embed
+`apple-touch-icon.png` into the worker (`server/worker/src/index.ts`,
+`APPLE_TOUCH_ICON_PNG_B64`) with:
+
+```sh
+base64 -i brand/png/apple-touch-icon.png | tr -d '\n'
+```

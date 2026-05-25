@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Acme Robotics · Release attestation</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Public attestation log for Acme Robotics releases. Powered by Governor.">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<style>
+  /* ---- THEME (per-page, would be driven from JSON in the worker) ---------- */
+  :root {
+    --brand:        #d2691e;   /* Acme's accent              */
+    --brand-soft:   #fbe9d8;   /* tinted background          */
+    --fg:           #1c1410;
+    --bg:           #fffbf6;
+    --muted:        #7a6a5e;
+    --rule:         #efe3d4;
+    --code-bg:      #f6ede1;
+    --allow:        #1f6f5c;
+    --deny:         #b04a2a;
+    --pending:      #b08a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg:#f1e6d8; --bg:#1a1410; --muted:#a89786; --rule:#3a2f25;
+            --brand-soft:#3a2615; --code-bg:#2a1f15;
+            --allow:#4fb89c; --deny:#d97a55; --pending:#d4b35a; }
+  }
+  /* ---- LAYOUT (would ship in the worker; tenant-stable) ------------------ */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font: 15px/1.55 ui-sans-serif, -apple-system, system-ui, sans-serif;
+         color: var(--fg); background: var(--bg); -webkit-font-smoothing: antialiased; }
+  main { max-width: 760px; margin: 0 auto; padding: 56px 24px 80px; }
+  .brandbar { display: flex; align-items: center; gap: 14px; margin: 0 0 36px;
+              padding-bottom: 20px; border-bottom: 1px solid var(--rule); }
+  .brandbar .logo { width: 36px; height: 36px; border-radius: 8px;
+                    background: var(--brand); color: #fff; display: grid;
+                    place-items: center; font: 700 18px/1 ui-sans-serif, sans-serif; }
+  .brandbar h1 { font: 600 18px/1.2 ui-sans-serif, sans-serif; margin: 0; }
+  .brandbar .sub { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+  .banner { background: var(--brand-soft); border: 1px solid var(--rule);
+            border-radius: 10px; padding: 20px 22px; margin: 0 0 36px;
+            display: flex; align-items: center; gap: 14px; }
+  .banner .dot { width: 10px; height: 10px; border-radius: 50%;
+                 background: var(--allow); flex: 0 0 auto; box-shadow: 0 0 0 4px rgba(31,111,92,.15); }
+  .banner.warn .dot { background: var(--pending); box-shadow: 0 0 0 4px rgba(176,138,42,.15); }
+  .banner h2 { font: 600 16px/1.3 ui-sans-serif, sans-serif; margin: 0 0 2px; }
+  .banner p  { font-size: 13px; color: var(--muted); margin: 0; }
+  h3 { font: 600 11px/1 ui-sans-serif, sans-serif; letter-spacing: .1em;
+       text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }
+  .card { border: 1px solid var(--rule); border-radius: 10px; padding: 18px 22px;
+          margin: 0 0 12px; background: var(--bg); }
+  .card .head { display: flex; align-items: baseline; justify-content: space-between;
+                gap: 16px; margin-bottom: 14px; }
+  .card .head .id   { font: 600 15px/1.2 ui-sans-serif, sans-serif; }
+  .card .head .when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .pill { display: inline-block; font: 600 10px/1 ui-sans-serif, sans-serif;
+          letter-spacing: .08em; text-transform: uppercase; padding: 4px 8px;
+          border-radius: 999px; margin-left: 8px; vertical-align: 1px; }
+  .pill.allow { background: rgba(31,111,92,.12);  color: var(--allow); }
+  .pill.deny  { background: rgba(176,74,42,.12);  color: var(--deny);  }
+  .pill.pending { background: rgba(176,138,42,.14); color: var(--pending); }
+  ul.rules { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+  ul.rules li { display: flex; gap: 10px; padding: 6px 0; align-items: baseline; }
+  ul.rules .mk { font: 14px/1 ui-monospace, Menlo, monospace; width: 14px; flex: 0 0 auto; }
+  ul.rules .ok  .mk { color: var(--allow); }
+  ul.rules .no  .mk { color: var(--muted); }
+  ul.rules .lab { flex: 1; }
+  ul.rules .by  { color: var(--muted); font-size: 12px; }
+  .timeline { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+  .timeline li { display: grid; grid-template-columns: 84px 14px 1fr;
+                 gap: 12px; padding: 10px 0; border-top: 1px solid var(--rule); align-items: baseline; }
+  .timeline li:first-child { border-top: 0; }
+  .timeline .t { color: var(--muted); font: 12px/1.4 ui-monospace, Menlo, monospace; }
+  .timeline .m { color: var(--brand); font: 14px/1 ui-monospace, Menlo, monospace; }
+  .timeline .d code { font: 12px ui-monospace, Menlo, monospace;
+                      background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule);
+           display: flex; justify-content: space-between; gap: 12px;
+           color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+
+<div class="brandbar">
+  <div class="logo">A</div>
+  <div>
+    <h1>Acme Robotics · Release attestation</h1>
+    <p class="sub">Live record of who has signed off on what, and what is still waiting.</p>
+  </div>
+</div>
+
+<div class="banner">
+  <span class="dot"></span>
+  <div>
+    <h2>All tracked releases currently allow deployment.</h2>
+    <p>3 subjects tracked · last change 4 minutes ago</p>
+  </div>
+</div>
+
+<h3>Tracked subjects</h3>
+
+<div class="card">
+  <div class="head"><div class="id">api · v2.3.0 <span class="pill allow">allow</span></div><div class="when">4 min ago</div></div>
+  <ul class="rules">
+    <li class="ok"><span class="mk">✓</span><span class="lab">tests-green</span>     <span class="by">ci/github-actions · 1h ago</span></li>
+    <li class="ok"><span class="mk">✓</span><span class="lab">code-review</span>      <span class="by">Bob (reviewer) · 52m ago</span></li>
+    <li class="ok"><span class="mk">✓</span><span class="lab">security-review</span> <span class="by">Carol (security-officer) · 28m ago</span></li>
+    <li class="ok"><span class="mk">✓</span><span class="lab">two-managers</span>     <span class="by">Dana, Eli (release-manager, cto) · 4m ago</span></li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="head"><div class="id">web · v1.8.2 <span class="pill allow">allow</span></div><div class="when">2 h ago</div></div>
+  <ul class="rules">
+    <li class="ok"><span class="mk">✓</span><span class="lab">tests-green</span>     <span class="by">ci/github-actions · 3h ago</span></li>
+    <li class="ok"><span class="mk">✓</span><span class="lab">code-review</span>      <span class="by">Fran (reviewer) · 2h ago</span></li>
+    <li class="ok"><span class="mk">✓</span><span class="lab">security-review</span> <span class="by">Carol (security-officer) · 2h ago</span></li>
+    <li class="ok"><span class="mk">✓</span><span class="lab">two-managers</span>     <span class="by">Dana, Greg (release-manager, eng-manager) · 2h ago</span></li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="head"><div class="id">mobile · v3.1.0-rc.2 <span class="pill pending">pending</span></div><div class="when">25 min ago</div></div>
+  <ul class="rules">
+    <li class="ok"><span class="mk">✓</span><span class="lab">tests-green</span>     <span class="by">ci/github-actions · 25m ago</span></li>
+    <li class="ok"><span class="mk">✓</span><span class="lab">code-review</span>      <span class="by">Hugo (reviewer) · 18m ago</span></li>
+    <li class="no"><span class="mk">◯</span><span class="lab">security-review</span> <span class="by">waiting on actor_with_role:security-officer</span></li>
+    <li class="no"><span class="mk">◯</span><span class="lab">two-managers</span>     <span class="by">0 of 2 · release-manager · eng-manager · cto</span></li>
+  </ul>
+</div>
+
+<h3 style="margin-top:36px">Recent activity</h3>
+<ul class="timeline">
+  <li><span class="t">4m  ago</span><span class="m">●</span><span class="d"><b>api · v2.3.0</b> reached <code>allow</code> — Eli (cto) attested <code>two-managers</code></span></li>
+  <li><span class="t">18m ago</span><span class="m">●</span><span class="d"><b>mobile · v3.1.0-rc.2</b> Hugo (reviewer) attested <code>code-review</code></span></li>
+  <li><span class="t">25m ago</span><span class="m">●</span><span class="d"><b>mobile · v3.1.0-rc.2</b> opened against checklist <code>release-v1</code></span></li>
+  <li><span class="t">28m ago</span><span class="m">●</span><span class="d"><b>api · v2.3.0</b> Carol (security-officer) attested <code>security-review</code> — <i>no new deps; secrets unchanged</i></span></li>
+  <li><span class="t">52m ago</span><span class="m">●</span><span class="d"><b>api · v2.3.0</b> Bob (reviewer) attested <code>code-review</code></span></li>
+  <li><span class="t">1h  ago</span><span class="m">●</span><span class="d"><b>api · v2.3.0</b> opened against checklist <code>release-v1</code></span></li>
+</ul>
+
+<footer>
+  <span>Public read-only view · Acme Robotics</span>
+  <span>Powered by <a href="https://github.com/makemore/governor">Governor</a></span>
+</footer>
+
+</main>
+</body>
+</html>
