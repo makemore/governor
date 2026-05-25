@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Governor — multi-party attestation log</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Governor is an append-only, multi-party attestation log with a rule evaluator over it. Humans and agents sign claims of the same shape; the gate decides what counts.">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="Governor">
+<meta property="og:description" content="An append-only, multi-party attestation log with a rule evaluator over it.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://makemore.github.io/governor/">
+<style>
+  :root { --fg: #1a1a1a; --bg: #fafaf7; --muted: #6b6b6b; --rule: #e5e5e0;
+          --code-bg: #f1efe9; --jade: #1f6f5c; --rust: #b04a2a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #e8e6df; --bg: #111418; --muted: #8b8d92; --rule: #2a2f36;
+            --code-bg: #1a1f26; --jade: #4fb89c; --rust: #d97a55; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font: 16px/1.6 ui-sans-serif, -apple-system, system-ui, "Segoe UI",
+                sans-serif; color: var(--fg); background: var(--bg);
+         -webkit-font-smoothing: antialiased; }
+  main { max-width: 640px; margin: 0 auto; padding: 12vh 24px 8vh; }
+  header { display: flex; align-items: center; gap: 16px; margin: 0 0 8px; }
+  header h1 { font-size: 32px; font-weight: 600; letter-spacing: -.02em; margin: 0; }
+  .tagline { color: var(--muted); margin: 0 0 40px; font-size: 17px; }
+  section { margin: 40px 0; }
+  h2 { font-size: 13px; font-weight: 600; letter-spacing: .08em;
+       text-transform: uppercase; color: var(--muted); margin: 0 0 16px; }
+  p { margin: 0 0 14px; }
+  a { color: var(--fg); text-decoration: underline; text-underline-offset: 3px;
+      text-decoration-color: var(--rule); transition: text-decoration-color .15s; }
+  a:hover { text-decoration-color: var(--fg); }
+  code { font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace;
+         background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+  pre { font: 13px/1.55 ui-monospace, Menlo, Consolas, monospace;
+        background: var(--code-bg); padding: 18px 20px; border-radius: 8px;
+        overflow-x: auto; margin: 0; }
+  .allow { color: var(--jade); font-weight: 600; }
+  .deny  { color: var(--rust); font-weight: 600; }
+  .links { list-style: none; padding: 0; margin: 0; }
+  .links li { padding: 12px 0; border-top: 1px solid var(--rule);
+              display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+  .links li:last-child { border-bottom: 1px solid var(--rule); }
+  .links .label { font-weight: 500; }
+  .links .desc { color: var(--muted); font-size: 14px; flex: 1; }
+  footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--rule);
+           color: var(--muted); font-size: 13px; display: flex;
+           justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .pill { display: inline-block; font: 11px/1 ui-sans-serif, system-ui, sans-serif;
+          letter-spacing: .06em; text-transform: uppercase; padding: 4px 8px;
+          border: 1px solid var(--rule); border-radius: 999px;
+          color: var(--muted); vertical-align: middle; margin-left: 10px; }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true">
+    <circle cx="32" cy="32" r="25" fill="none" stroke="currentColor" stroke-width="5"/>
+    <path d="M19 33 L28.5 43 L46 22" fill="none" stroke="currentColor"
+          stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <h1>Governor<span class="pill">pre-release</span></h1>
+</header>
+<p class="tagline">An append-only, multi-party attestation log with a rule
+   evaluator over it. Humans and agents sign claims of the same shape;
+   the gate decides what counts.</p>
+
+<section>
+  <h2>What it looks like</h2>
+<pre>$ gov gate myapp@v1.4.0
+
+  ✓  tests-green        ci/github-actions               2m ago
+  ✓  code-review        Bob (reviewer)                  4m ago
+  ◯  security-review    waiting on  actor_with_role:security-officer
+  ◯  two-managers       0 of 2      release-manager · engineering-manager · cto
+
+  ── decision: <span class="deny">DENY</span>  ·  2 of 4 satisfied ──────────────────────────────────
+
+$ gov attest myapp@v1.4.0 security-review --note "no new deps; secrets unchanged"
+
+  ✓  recorded as Carol (security-officer)
+
+  ── decision: <span class="allow">ALLOW</span> · 4 of 4 satisfied ───────────────────────────────────</pre>
+</section>
+
+<section>
+  <h2>Read next</h2>
+  <ul class="links">
+    <li>
+      <span><a href="https://github.com/makemore/governor/tree/main/examples/agent-handoff">Agent handoff example</a></span>
+      <span class="desc">~3 min. The core idea: humans and agents co-sign, rule decides.</span>
+    </li>
+    <li>
+      <span><a href="https://github.com/makemore/governor/tree/main/examples/quickstart">Release quickstart</a></span>
+      <span class="desc">~5 min. Full surface area against a deployed worker.</span>
+    </li>
+    <li>
+      <span><a href="https://github.com/makemore/governor/tree/main/server/worker">Deploy your own server</a></span>
+      <span class="desc">Cloudflare Worker + D1. Five minutes from <code>git clone</code> to live.</span>
+    </li>
+    <li>
+      <span><a href="https://github.com/makemore/governor/tree/main/spec">Read the spec</a></span>
+      <span class="desc">OpenAPI, rule DSL JSON Schema, cross-language conformance vectors.</span>
+    </li>
+  </ul>
+</section>
+
+<footer>
+  <span>Apache-2.0 · <a href="https://github.com/makemore/governor">github.com/makemore/governor</a></span>
+  <span>Wire formats may change before <code>v0.1.0</code>.</span>
+</footer>
+
+</main>
+</body>
+</html>
