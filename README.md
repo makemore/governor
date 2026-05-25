@@ -7,6 +7,29 @@ Designed to be embedded, self-hosted, or consumed as a hosted service.
 > implementation is being extracted from an existing project. Wire formats
 > and APIs may change without notice until `v0.1.0`.
 
+## What it looks like
+
+```console
+$ gov gate myapp@v1.4.0
+
+  ✓  tests-green        ci/github-actions               2m ago
+  ✓  code-review        Bob (reviewer)                  4m ago
+  ◯  security-review    waiting on  actor_with_role:security-officer
+  ◯  two-managers       0 of 2      release-manager · engineering-manager · cto
+
+  ── decision: DENY  ·  2 of 4 satisfied ──────────────────────────────────
+
+$ gov attest myapp@v1.4.0 security-review --note "no new deps; secrets unchanged"
+
+  ✓  recorded as Carol (security-officer)
+
+  ── decision: ALLOW · 4 of 4 satisfied ───────────────────────────────────
+```
+
+Two commands, one round trip each. The gate is a function of attestations
+and a checklist that was pinned before work started; no party can move the
+bar or sign on another's behalf.
+
 ## Layout
 
 | Path | Role |
