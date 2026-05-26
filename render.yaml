@@ -1,0 +1,54 @@
+# Render Blueprint: one-click deploy of the Governor Node reference server.
+#
+# Place the deploy-to-Render button in README.md and point it at this file.
+# Render reads render.yaml from the repo root; this file assumes the repo
+# root *is* the published `governor` repo (the published mirror; not the
+# vibepolice monorepo).
+#
+# What you get: a single web service backed by a 1 GB persistent disk
+# mounted at /data, with continuous Litestream replication to an
+# S3-compatible bucket you provide at deploy time. Render will prompt
+# for the four marked secrets in the dashboard before the first deploy
+# completes; without them the container refuses to start (by design —
+# an attestation log without off-host replication isn't durable).
+
+services:
+  - type: web
+    name: governor
+    runtime: docker
+    plan: starter # disks require >= starter
+    region: oregon
+    dockerContext: .
+    dockerfilePath: ./server/node/Dockerfile
+    healthCheckPath: /
+    # Render's own recommendation for button-deployed services: avoid
+    # surprise redeploys when the upstream repo updates.
+    autoDeploy: false
+    envVars:
+      - key: GOVERNOR_BOOTSTRAP_TOKEN
+        generateValue: true
+      - key: GOVERNOR_DB_PATH
+        value: /data/governor.sqlite
+      - key: GOVERNOR_PUBLIC_ENABLED
+        value: "false"
+      - key: GOVERNOR_BRAND_NAME
+        value: Governor
+
+      # ---- Required at deploy time: off-host replication ----
+      # Render will prompt for these in the UI; deploy won't complete
+      # until they are filled in. See server/node/README.md for a step-
+      # by-step Backblaze B2 setup (Cloudflare R2 / AWS S3 work too).
+      - key: GOVERNOR_REPLICATION_URL
+        sync: false # e.g. s3://my-governor-bucket/prod
+      - key: LITESTREAM_ACCESS_KEY_ID
+        sync: false
+      - key: LITESTREAM_SECRET_ACCESS_KEY
+        sync: false
+      - key: LITESTREAM_S3_ENDPOINT
+        sync: false # e.g. https://s3.us-west-002.backblazeb2.com (B2)
+      - key: LITESTREAM_S3_REGION
+        sync: false # e.g. us-west-002
+    disk:
+      name: governor-data
+      mountPath: /data
+      sizeGB: 1

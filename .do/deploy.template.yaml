@@ -1,0 +1,52 @@
+# DigitalOcean App Platform one-click deploy template.
+#
+# Wired for Tier 1 (Litestream replication to an S3-compatible bucket).
+# App Platform services have an ephemeral filesystem, which is exactly
+# what Litestream is built for: the container restores SQLite from the
+# replica on every cold start and streams the WAL back continuously.
+#
+# DigitalOcean will prompt for every SECRET-typed env var with an empty
+# value before the first deploy completes. Without them the container
+# refuses to start, by design.
+
+spec:
+  name: governor
+  region: nyc
+  services:
+    - name: web
+      dockerfile_path: server/node/Dockerfile
+      source_dir: /
+      http_port: 8080
+      instance_count: 1
+      instance_size_slug: apps-s-1vcpu-512mb
+      health_check:
+        http_path: /
+        initial_delay_seconds: 10
+        period_seconds: 30
+        timeout_seconds: 5
+        failure_threshold: 3
+      envs:
+        - key: GOVERNOR_BOOTSTRAP_TOKEN
+          type: SECRET
+          value: ""
+        - key: GOVERNOR_DB_PATH
+          value: /tmp/governor.sqlite
+        - key: GOVERNOR_PUBLIC_ENABLED
+          value: "false"
+        - key: GOVERNOR_BRAND_NAME
+          value: Governor
+
+        # ---- Required at deploy time ----
+        - key: GOVERNOR_REPLICATION_URL
+          type: SECRET
+          value: ""
+        - key: LITESTREAM_ACCESS_KEY_ID
+          type: SECRET
+          value: ""
+        - key: LITESTREAM_SECRET_ACCESS_KEY
+          type: SECRET
+          value: ""
+        - key: LITESTREAM_S3_ENDPOINT
+          value: ""
+        - key: LITESTREAM_S3_REGION
+          value: ""
