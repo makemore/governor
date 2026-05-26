@@ -15,7 +15,8 @@ need to see the brand and know what it is for in under a second.
 | File | Use |
 |---|---|
 | [`mark.svg`](./mark.svg) | The mark, alone. Uses `currentColor`. Drop into anywhere theming should follow the surrounding text colour |
-| [`logo.svg`](./logo.svg) | Mark + "Governor" wordmark lockup. Wordmark uses system fonts; outline the text before any external distribution |
+| [`logo.svg`](./logo.svg) | Mark + "Governor" wordmark lockup. Uses `currentColor`. Use anywhere CSS sets text colour (HTML pages, inline `<svg>`). Wordmark uses system fonts; outline the text before any external distribution |
+| [`logo-light.svg`](./logo-light.svg), [`logo-dark.svg`](./logo-dark.svg) | Pre-themed logo variants (Slate / Bone). Use these in static rendering contexts that strip CSS — most notably GitHub README `<img>` tags — paired in a `<picture>` element with `prefers-color-scheme` |
 | [`favicon.svg`](./favicon.svg) | Hard-coded `#111` fill; suitable as a browser favicon directly. Modern browsers render SVG favicons natively |
 | [`preview-chosen.html`](./preview-chosen.html) | Open in a browser to see all variants at multiple sizes on light + dark |
 | [`preview.html`](./preview.html) | Side-by-side comparison of the three original concepts (gate, seal, rosette). Kept for history |

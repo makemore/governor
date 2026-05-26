@@ -1,5 +1,8 @@
 <p align="left">
-  <img src="./brand/logo.svg" alt="Governor" width="260">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./brand/logo-dark.svg">
+    <img src="./brand/logo-light.svg" alt="Governor" width="260">
+  </picture>
 </p>
 
 An append-only, multi-party attestation log with a rule evaluator over it.

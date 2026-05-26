@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" role="img" aria-label="Governor">
+  <title>Governor</title>
+  <!-- Pre-themed variant for dark backgrounds. Ink = Bone (#e8e6df). -->
+  <!-- Use logo.svg (currentColor) anywhere CSS color context is available. -->
+  <g transform="translate(8 8)">
+    <circle cx="32" cy="32" r="25" fill="none" stroke="#e8e6df" stroke-width="5"/>
+    <path d="M19 33 L28.5 43 L46 22" fill="none" stroke="#e8e6df"
+          stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="90" y="52"
+        font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
+        font-size="42" font-weight="600" letter-spacing="-1"
+        fill="#e8e6df">Governor</text>
+</svg>
