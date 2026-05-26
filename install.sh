@@ -50,17 +50,24 @@ asset="${BIN}_${ver_nopre}_${os}_${arch}.tar.gz"
 url="https://github.com/$REPO/releases/download/$version/$asset"
 
 # Decide install dir.
+# Order of preference: $GOV_INSTALL_DIR, then $HOME/.local/bin, then
+# /usr/local/bin (with sudo if needed). For the first two, try to create
+# the directory ourselves rather than escalating.
 install_dir="${GOV_INSTALL_DIR:-}"
 sudo=""
-if [ -z "$install_dir" ]; then
-  install_dir="$HOME/.local/bin"
-  if ! mkdir -p "$install_dir" 2>/dev/null; then
-    install_dir="/usr/local/bin"
+if [ -n "$install_dir" ]; then
+  mkdir -p "$install_dir" 2>/dev/null || true
+  if ! [ -w "$install_dir" ]; then
     sudo="sudo"
   fi
-fi
-if ! [ -w "$install_dir" ] && [ -z "$sudo" ]; then
-  sudo="sudo"
+else
+  install_dir="$HOME/.local/bin"
+  if mkdir -p "$install_dir" 2>/dev/null && [ -w "$install_dir" ]; then
+    :
+  else
+    install_dir="/usr/local/bin"
+    if ! [ -w "$install_dir" ]; then sudo="sudo"; fi
+  fi
 fi
 
 info "downloading $asset"
