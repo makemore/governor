@@ -1,0 +1,136 @@
+/**
+ * Public read-only status view. Opt-in via GOVERNOR_PUBLIC_ENABLED=true.
+ * Mirrors server/worker/src/public.ts; only the storage calls differ.
+ */
+import { gateRun, loadRun } from './runs.js';
+import type { Db } from './storage.js';
+import type { Config } from './types.js';
+
+export interface PublicConfig {
+  brandName: string;
+  accent: string;
+  logoUrl: string | null;
+  title: string;
+  tagline: string;
+  hideActorNames: boolean;
+  hideNotes: boolean;
+  subjectLimit: number;
+  activityLimit: number;
+}
+
+export function publicConfigFrom(cfg: Config): PublicConfig {
+  return {
+    brandName: cfg.brandName,
+    accent: cfg.brandAccent,
+    logoUrl: cfg.brandLogoUrl,
+    title: cfg.publicTitle,
+    tagline: cfg.publicTagline,
+    hideActorNames: cfg.publicHideActorNames,
+    hideNotes: cfg.publicHideNotes,
+    subjectLimit: 10,
+    activityLimit: 20,
+  };
+}
+
+export interface ActivityRow {
+  attestation_id: string;
+  run_id: string;
+  item_key: string;
+  actor_kind: string;
+  actor_display_name: string;
+  note: string | null;
+  attested_at: string;
+  subject_id: string;
+  subject_label: string | null;
+  checklist_title: string | null;
+}
+
+export interface SubjectView {
+  runId: string;
+  subjectId: string;
+  subjectLabel: string | null;
+  checklistTitle: string | null;
+  createdAt: string;
+  decision: 'allow' | 'deny';
+  totalItems: number;
+  satisfiedItems: number;
+  items: {
+    key: string;
+    description: string | null;
+    satisfied: boolean;
+    attestations: { actorKind: string; displayName: string; attestedAt: string }[];
+  }[];
+}
+
+export function loadRecentSubjects(db: Db, limit: number): SubjectView[] {
+  const rows = db
+    .prepare(`SELECT id FROM runs ORDER BY created_at DESC LIMIT ?`)
+    .all(limit) as { id: string }[];
+  const out: SubjectView[] = [];
+  for (const r of rows) {
+    const bundle = loadRun(db, r.id);
+    if (!bundle) continue;
+    const gate = gateRun(db, bundle);
+    const attsByItem = new Map<string, typeof bundle.attestations>();
+    for (const a of bundle.attestations) {
+      const list = attsByItem.get(a.item_key) ?? [];
+      list.push(a);
+      attsByItem.set(a.item_key, list);
+    }
+    const satisfiedKeys = new Set(gate.items.filter((i) => i.satisfied).map((i) => i.key));
+    out.push({
+      runId: bundle.run.id,
+      subjectId: bundle.run.subject_id,
+      subjectLabel: bundle.run.subject_label,
+      checklistTitle: bundle.run.checklist_title,
+      createdAt: bundle.run.created_at,
+      decision: gate.decision,
+      totalItems: gate.summary.items_total,
+      satisfiedItems: gate.summary.items_satisfied,
+      items: bundle.items.map((i) => ({
+        key: i.key,
+        description: i.description,
+        satisfied: satisfiedKeys.has(i.key),
+        attestations: (attsByItem.get(i.key) ?? []).map((a) => ({
+          actorKind: a.actor_kind,
+          displayName: a.actor_display_name,
+          attestedAt: a.attested_at,
+        })),
+      })),
+    });
+  }
+  return out;
+}
+
+export function loadRecentActivity(db: Db, limit: number): ActivityRow[] {
+  return db
+    .prepare(
+      `SELECT a.id AS attestation_id, a.run_id, a.item_key,
+              ac.kind AS actor_kind, ac.display_name AS actor_display_name,
+              a.note, a.attested_at,
+              r.subject_id, r.subject_label, r.checklist_title
+       FROM attestations a
+       JOIN actors ac ON ac.id = a.actor_id
+       JOIN runs   r  ON r.id  = a.run_id
+       ORDER BY a.attested_at DESC
+       LIMIT ?`,
+    )
+    .all(limit) as ActivityRow[];
+}
+
+export function relativeTime(isoTs: string, nowMs: number): string {
+  const then = Date.parse(isoTs);
+  if (!Number.isFinite(then)) return isoTs;
+  const sec = Math.max(0, Math.round((nowMs - then) / 1000));
+  if (sec < 60)        return `${sec}s ago`;
+  if (sec < 3600)      return `${Math.round(sec / 60)}m ago`;
+  if (sec < 86400)     return `${Math.round(sec / 3600)}h ago`;
+  if (sec < 86400 * 7) return `${Math.round(sec / 86400)}d ago`;
+  return new Date(then).toISOString().slice(0, 10);
+}
+
+export function escape(s: string): string {
+  return s.replace(/[&<>"']/g, (ch) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]!),
+  );
+}

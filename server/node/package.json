@@ -1,0 +1,30 @@
+{
+  "name": "@governor/node-server",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Portable Governor reference server: Node + Hono + SQLite. Mirrors the Cloudflare Workers reference at server/worker.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@governor/core": "file:../../core/ts",
+    "@hono/node-server": "^1.13.0",
+    "better-sqlite3": "^11.3.0",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.16.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

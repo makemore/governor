@@ -1,0 +1,64 @@
+# Local + self-hosted deployment of the Governor Node reference server.
+#
+# Usage (single-host, evaluation):
+#   cd governor/server/node
+#   cp .env.example .env       # set GOVERNOR_BOOTSTRAP_TOKEN, leave
+#                              # GOVERNOR_ALLOW_SINGLE_HOST=true uncommented
+#   docker compose up --build
+#
+# Usage (durable, recommended): also set GOVERNOR_REPLICATION_URL plus
+# LITESTREAM_* credentials in .env, then `docker compose up --build`. The
+# entrypoint will restore from the bucket on boot and replicate the WAL
+# continuously while the server runs.
+#
+# Data lives in the named volume `governor-data`; nuke it with
+# `docker compose down -v` (destroys all local attestations; replicated
+# deployments can re-restore on the next boot).
+
+services:
+  governor:
+    build:
+      # Context is the governor/ directory so the build can see core/ts.
+      context: ../..
+      dockerfile: server/node/Dockerfile
+    image: governor:local
+    restart: unless-stopped
+    ports:
+      - "${GOVERNOR_PORT:-8080}:8080"
+    environment:
+      # Required: the initial admin token. Set in your shell or .env.
+      GOVERNOR_BOOTSTRAP_TOKEN: "${GOVERNOR_BOOTSTRAP_TOKEN:?set GOVERNOR_BOOTSTRAP_TOKEN before bringing the stack up}"
+      GOVERNOR_VERSION: "${GOVERNOR_VERSION:-dev}"
+
+      # Optional: enable the read-only public view.
+      GOVERNOR_PUBLIC_ENABLED: "${GOVERNOR_PUBLIC_ENABLED:-false}"
+      GOVERNOR_BRAND_NAME: "${GOVERNOR_BRAND_NAME:-Governor}"
+      GOVERNOR_BRAND_ACCENT: "${GOVERNOR_BRAND_ACCENT:-#1f6f5c}"
+      GOVERNOR_BRAND_LOGO_URL: "${GOVERNOR_BRAND_LOGO_URL:-}"
+      GOVERNOR_PUBLIC_TITLE: "${GOVERNOR_PUBLIC_TITLE:-Attestation log}"
+      GOVERNOR_PUBLIC_TAGLINE: "${GOVERNOR_PUBLIC_TAGLINE:-}"
+      GOVERNOR_PUBLIC_HIDE_ACTOR_NAMES: "${GOVERNOR_PUBLIC_HIDE_ACTOR_NAMES:-false}"
+      GOVERNOR_PUBLIC_HIDE_NOTES: "${GOVERNOR_PUBLIC_HIDE_NOTES:-false}"
+
+      # Durability. Leave GOVERNOR_REPLICATION_URL unset to run single-host
+      # (requires GOVERNOR_ALLOW_SINGLE_HOST=true), or set it plus the
+      # LITESTREAM_* credentials to enable off-host replication.
+      GOVERNOR_REPLICATION_URL: "${GOVERNOR_REPLICATION_URL:-}"
+      LITESTREAM_ACCESS_KEY_ID: "${LITESTREAM_ACCESS_KEY_ID:-}"
+      LITESTREAM_SECRET_ACCESS_KEY: "${LITESTREAM_SECRET_ACCESS_KEY:-}"
+      LITESTREAM_S3_ENDPOINT: "${LITESTREAM_S3_ENDPOINT:-}"
+      LITESTREAM_S3_REGION: "${LITESTREAM_S3_REGION:-}"
+      LITESTREAM_S3_FORCE_PATH_STYLE: "${LITESTREAM_S3_FORCE_PATH_STYLE:-}"
+      GOVERNOR_ALLOW_SINGLE_HOST: "${GOVERNOR_ALLOW_SINGLE_HOST:-}"
+      GOVERNOR_ALLOW_EPHEMERAL: "${GOVERNOR_ALLOW_EPHEMERAL:-}"
+    volumes:
+      - governor-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  governor-data:

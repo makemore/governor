@@ -1,0 +1,19 @@
+# Build context root for `docker build -f server/node/Dockerfile governor`.
+# Keep the context small so layer cache hits and so the build can't pick
+# up stale local artefacts.
+
+**/node_modules
+**/dist
+**/.git
+**/.env
+**/.env.*
+**/*.log
+**/data
+**/.DS_Store
+
+# Other server impls + tooling not needed for the Node build.
+server/worker
+cli
+sdk
+docs
+examples
