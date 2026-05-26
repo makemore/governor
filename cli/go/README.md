@@ -7,15 +7,19 @@ codes for CI.
 ## Install
 
 ```sh
-# from source (Go 1.22+)
+# macOS + Linux, prebuilt binary from the latest GitHub Release
+curl -fsSL https://raw.githubusercontent.com/makemore/governor/main/install.sh | sh
+
+# or from source (Go 1.22+)
 go install github.com/makemore/governor/cli/go/cmd/gov@latest
 
 # or from this checkout
 cd governor/cli/go && go build -o gov ./cmd/gov
 ```
 
-Homebrew, `curl | sh`, and pre-built archives are on the roadmap.
-Until then, `go install` is the supported path.
+Windows: download the `gov_*_windows_*.zip` from
+[Releases](https://github.com/makemore/governor/releases) and put `gov.exe`
+on your `%PATH%`. Homebrew is on the roadmap.
 
 ## Configure
 

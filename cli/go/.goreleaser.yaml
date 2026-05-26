@@ -1,0 +1,74 @@
+# GoReleaser config for the gov CLI.
+#
+# Triggered by .github/workflows/release.yml on tag push (v*).
+# Produces darwin/linux/windows binaries for amd64 and arm64, a checksum
+# file, and a GitHub Release with auto-generated changelog.
+#
+# Run locally (dry-run, no publish):
+#   cd cli/go && goreleaser release --snapshot --clean
+
+version: 2
+
+project_name: gov
+
+builds:
+  - id: gov
+    main: ./cmd/gov
+    binary: gov
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/makemore/governor/cli/go/internal/commands.Version={{ .Version }}
+
+archives:
+  - id: gov
+    ids: [gov]
+    name_template: >-
+      gov_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  draft: false
+  prerelease: auto
+  name_template: "gov {{ .Version }}"
+  header: |
+    ## gov {{ .Version }}
+
+    Install with:
+
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/makemore/governor/main/install.sh | sh
+    ```
+
+    Or download a binary below and put it on your `$PATH`.

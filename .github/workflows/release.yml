@@ -1,0 +1,37 @@
+# Publishes the gov CLI binaries to a GitHub Release whenever a tag
+# matching v* is pushed. Driven by cli/go/.goreleaser.yaml.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: cli/go/go.mod
+          cache: true
+          cache-dependency-path: cli/go/go.sum
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+          workdir: cli/go
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

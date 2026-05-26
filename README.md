@@ -53,8 +53,8 @@ Six commands, end-to-end: install `gov`, deploy a server, bootstrap, do
 something useful. Pick a platform below for a copy-pasteable block.
 
 ```sh
-# 1. install the CLI
-go install github.com/makemore/governor/cli/go/cmd/gov@latest
+# 1. install the CLI (macOS + Linux; Windows: grab a zip from Releases)
+curl -fsSL https://raw.githubusercontent.com/makemore/governor/main/install.sh | sh
 
 # 2. deploy a server  ← swap this line for your platform (see fly-outs below)
 
@@ -74,15 +74,33 @@ gov gate <run-id>
 <details>
 <summary><b>Cloudflare Workers</b> — D1, no Litestream, replicated by the platform</summary>
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/makemore/governor/tree/main/server/worker)
+
+The button forks the repo, provisions the D1 database, wires the binding,
+and deploys the worker. When it finishes you have a `*.workers.dev` URL
+but no admin yet. Set the bootstrap secret once, then point `gov` at it:
+
 ```sh
-go install github.com/makemore/governor/cli/go/cmd/gov@latest
-cd governor/server/worker && npx wrangler d1 create governor
-# paste the printed database_id into wrangler.toml, then:
-npx wrangler d1 migrations apply governor --remote
-TOKEN=$(openssl rand -hex 32) && echo "$TOKEN" | npx wrangler secret put GOVERNOR_BOOTSTRAP_TOKEN
-npx wrangler deploy
-GOVERNOR_BASE_URL=https://governor.<you>.workers.dev GOVERNOR_BOOTSTRAP_TOKEN=$TOKEN gov bootstrap
+# in your fork, from server/worker/
+TOKEN=$(openssl rand -hex 32)
+echo "$TOKEN" | npx wrangler secret put GOVERNOR_BOOTSTRAP_TOKEN
+
+curl -fsSL https://raw.githubusercontent.com/makemore/governor/main/install.sh | sh
+GOVERNOR_BASE_URL=https://governor.<you>.workers.dev \
+GOVERNOR_BOOTSTRAP_TOKEN=$TOKEN \
+  gov bootstrap
 gov whoami
+# rotate the bootstrap token now: `npx wrangler secret delete GOVERNOR_BOOTSTRAP_TOKEN`
+```
+
+Prefer the manual path? Skip the button and run:
+
+```sh
+cd server/worker && npm install && npm run db:create
+# paste the printed database_id into wrangler.toml, then:
+npm run db:migrate:remote
+TOKEN=$(openssl rand -hex 32) && echo "$TOKEN" | npx wrangler secret put GOVERNOR_BOOTSTRAP_TOKEN
+npm run deploy
 ```
 </details>
 
@@ -90,7 +108,7 @@ gov whoami
 <summary><b>Docker (local, or any host with a daemon)</b> — SQLite + Litestream to your bucket</summary>
 
 ```sh
-go install github.com/makemore/governor/cli/go/cmd/gov@latest
+curl -fsSL https://raw.githubusercontent.com/makemore/governor/main/install.sh | sh
 cd governor/server/node && cp .env.example .env
 # fill in GOVERNOR_BOOTSTRAP_TOKEN and the five LITESTREAM_* values
 docker compose up -d
@@ -107,7 +125,7 @@ for an ephemeral-mode escape hatch (development only).
 <summary><b>Fly.io</b> — Node image, Litestream sidecar, persistent volume</summary>
 
 ```sh
-go install github.com/makemore/governor/cli/go/cmd/gov@latest
+curl -fsSL https://raw.githubusercontent.com/makemore/governor/main/install.sh | sh
 cd governor && fly launch --copy-config --no-deploy
 TOKEN=$(openssl rand -hex 32)
 fly secrets set GOVERNOR_BOOTSTRAP_TOKEN=$TOKEN \
@@ -132,7 +150,7 @@ boot — that prompt **is** the durability contract. Once the platform
 prints a URL:
 
 ```sh
-go install github.com/makemore/governor/cli/go/cmd/gov@latest
+curl -fsSL https://raw.githubusercontent.com/makemore/governor/main/install.sh | sh
 GOVERNOR_BASE_URL=https://<your-app-url> \
 GOVERNOR_BOOTSTRAP_TOKEN=<token you set during deploy> \
   gov bootstrap
