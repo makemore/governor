@@ -47,6 +47,119 @@ bar or sign on another's behalf.
 Each language gets its own subdirectory inside these folders — for example
 `core/python/`, `cli/python/`, and later `core/go/`, `cli/go/`.
 
+## Run a server
+
+Six commands, end-to-end: install `gov`, deploy a server, bootstrap, do
+something useful. Pick a platform below for a copy-pasteable block.
+
+```sh
+# 1. install the CLI
+go install github.com/makemore/governor/cli/go/cmd/gov@latest
+
+# 2. deploy a server  ← swap this line for your platform (see fly-outs below)
+
+# 3. bootstrap (uses GOVERNOR_BASE_URL + GOVERNOR_BOOTSTRAP_TOKEN)
+gov bootstrap
+
+# 4. confirm
+gov whoami
+
+# 5. open a run from a checklist
+gov runs new ./release.json
+
+# 6. gate it (exit 0 = allow, exit 1 = deny)
+gov gate <run-id>
+```
+
+<details>
+<summary><b>Cloudflare Workers</b> — D1, no Litestream, replicated by the platform</summary>
+
+```sh
+go install github.com/makemore/governor/cli/go/cmd/gov@latest
+cd governor/server/worker && npx wrangler d1 create governor
+# paste the printed database_id into wrangler.toml, then:
+npx wrangler d1 migrations apply governor --remote
+TOKEN=$(openssl rand -hex 32) && echo "$TOKEN" | npx wrangler secret put GOVERNOR_BOOTSTRAP_TOKEN
+npx wrangler deploy
+GOVERNOR_BASE_URL=https://governor.<you>.workers.dev GOVERNOR_BOOTSTRAP_TOKEN=$TOKEN gov bootstrap
+gov whoami
+```
+</details>
+
+<details>
+<summary><b>Docker (local, or any host with a daemon)</b> — SQLite + Litestream to your bucket</summary>
+
+```sh
+go install github.com/makemore/governor/cli/go/cmd/gov@latest
+cd governor/server/node && cp .env.example .env
+# fill in GOVERNOR_BOOTSTRAP_TOKEN and the five LITESTREAM_* values
+docker compose up -d
+source .env && GOVERNOR_BASE_URL=http://localhost:8080 gov bootstrap
+gov whoami
+```
+
+Without `LITESTREAM_*` the container refuses to start. That refusal **is**
+the durability contract — see [`server/node/README.md`](./server/node/README.md)
+for an ephemeral-mode escape hatch (development only).
+</details>
+
+<details>
+<summary><b>Fly.io</b> — Node image, Litestream sidecar, persistent volume</summary>
+
+```sh
+go install github.com/makemore/governor/cli/go/cmd/gov@latest
+cd governor && fly launch --copy-config --no-deploy
+TOKEN=$(openssl rand -hex 32)
+fly secrets set GOVERNOR_BOOTSTRAP_TOKEN=$TOKEN \
+  LITESTREAM_BUCKET=... LITESTREAM_ENDPOINT=... \
+  LITESTREAM_ACCESS_KEY_ID=... LITESTREAM_SECRET_ACCESS_KEY=...
+fly deploy
+GOVERNOR_BASE_URL=https://<app>.fly.dev GOVERNOR_BOOTSTRAP_TOKEN=$TOKEN gov bootstrap
+```
+</details>
+
+<details>
+<summary><b>Render / DigitalOcean / Koyeb</b> — click-to-deploy, then bootstrap</summary>
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/makemore/governor)
+&nbsp;
+[![Deploy to DigitalOcean](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/makemore/governor/tree/main)
+&nbsp;
+[![Deploy to Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?type=git&repository=github.com/makemore/governor&branch=main&name=governor&ports=8080;http;/&builder=dockerfile&dockerfile=server/node/Dockerfile&env%5BGOVERNOR_DB_PATH%5D=/tmp/governor.sqlite)
+
+Each platform prompts for the five Litestream secrets before the first
+boot — that prompt **is** the durability contract. Once the platform
+prints a URL:
+
+```sh
+go install github.com/makemore/governor/cli/go/cmd/gov@latest
+GOVERNOR_BASE_URL=https://<your-app-url> \
+GOVERNOR_BOOTSTRAP_TOKEN=<token you set during deploy> \
+  gov bootstrap
+gov whoami
+```
+
+Bucket setup takes ~3 minutes:
+[Backblaze B2 walkthrough](./server/node/README.md#tier-1-setup-step-by-step-backblaze-b2).
+R2, S3, MinIO and Wasabi work identically with a different endpoint.
+</details>
+
+### Reference servers
+
+| Target | Runtime | Storage | Durability |
+|---|---|---|---|
+| [Cloudflare Workers](./server/worker) | Workers runtime | D1 (managed, replicated) | ✅ Replicated by the platform |
+| [Self-host / Render / Fly / DigitalOcean / Koyeb / Railway / VM](./server/node) | Node 20 in Docker | SQLite + Litestream → any S3-compatible bucket | ✅ Replicated to a bucket you own |
+
+**Railway** isn't listed above because it requires publishing a one-time
+template through the web UI before the button URL exists. The Dockerfile
+and env contract Just Work — connect this repo in the Railway dashboard,
+point the service at `server/node/Dockerfile`, and set the secrets.
+
+> **Repo URL note:** the buttons assume this repo is published at
+> `https://github.com/makemore/governor`. If the published mirror lives
+> at a different slug, swap it once in the three URLs above.
+
 ## Design principles
 
 1. **Spec first.** Wire formats are versioned and language-neutral. The
