@@ -1,7 +1,9 @@
 <p align="left">
+  <img src="./brand/gov-face-cycle.svg" alt="" width="64" align="middle">
+  &nbsp;&nbsp;
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="./brand/logo-dark.svg">
-    <img src="./brand/logo-light.svg" alt="Governor" width="260">
+    <img src="./brand/logo-light.svg" alt="Governor" width="220" align="middle">
   </picture>
 </p>
 
