@@ -1,0 +1,64 @@
+# Build the Governor Node image, push to Artifact Registry, deploy to Cloud Run.
+#
+# Trigger this from a GitHub push (Cloud Build → Triggers → connect repo), or
+# run it manually:
+#
+#   gcloud builds submit governor \
+#     --config=governor/deploy/gcp/cloudbuild.yaml \
+#     --substitutions=_REGION=europe-west1,_SERVICE=governor,_REPO=governor
+#
+# Prereqs (one-off, handled by terraform/):
+#   - Artifact Registry repo ${_REPO} exists in ${_REGION}
+#   - Cloud Run service ${_SERVICE} exists (created by terraform with a placeholder image)
+#   - The Cloud Build SA has roles/run.admin and roles/iam.serviceAccountUser
+#
+# Build context is the governor/ directory (parent of server/), per the
+# Dockerfile's instructions. Configure the trigger's "Repository" → "Included
+# files" to governor/** and its "Cloud Build configuration file location" to
+# /governor/deploy/gcp/cloudbuild.yaml so the build only runs on relevant edits.
+
+substitutions:
+  _REGION: europe-west1
+  _SERVICE: governor
+  _REPO: governor
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+steps:
+  # 1. Build the image. Context = governor/ so the Dockerfile can see core/ts.
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file=governor/server/node/Dockerfile
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - governor
+
+  # 2. Push both tags.
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}
+
+  # 3. Roll the Cloud Run revision. Service shape (scaling, env, secrets,
+  #    SA, volumes) is owned by Terraform; this step only swaps the image.
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --region=${_REGION}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+
+timeout: 1200s

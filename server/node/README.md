@@ -79,11 +79,11 @@ For **Cloudflare R2** the endpoint is
 | `PORT` | no | `8080` | HTTP listen port. |
 | `GOVERNOR_VERSION` | no | `dev` | Surfaced at `/`. |
 | **Durability** | | | |
-| `GOVERNOR_REPLICATION_URL` | Tier 1 | — | `s3://bucket/prefix`. Enables Litestream in the official image. |
-| `LITESTREAM_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY` | Tier 1 | — | Required when `GOVERNOR_REPLICATION_URL` is set. |
-| `LITESTREAM_S3_ENDPOINT` | sometimes | — | Set for R2 / B2 / MinIO / Wasabi; omit for AWS S3. |
-| `LITESTREAM_S3_REGION` | sometimes | — | Required for AWS S3; usually required for B2; `auto` for R2. |
-| `LITESTREAM_S3_FORCE_PATH_STYLE` | sometimes | — | `true` for B2 / MinIO. |
+| `GOVERNOR_REPLICATION_URL` | Tier 1 | — | `s3://bucket/prefix` for S3-compatible stores, or `gcs://bucket/prefix` for Google Cloud Storage. Enables Litestream in the official image. |
+| `LITESTREAM_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY` | Tier 1 (S3 only) | — | Required when `GOVERNOR_REPLICATION_URL` uses `s3://`. Not used for `gcs://` — see GCP section below. |
+| `LITESTREAM_S3_ENDPOINT` | sometimes | — | Set for R2 / B2 / MinIO / Wasabi; omit for AWS S3. Ignored for `gcs://`. |
+| `LITESTREAM_S3_REGION` | sometimes | — | Required for AWS S3; usually required for B2; `auto` for R2. Ignored for `gcs://`. |
+| `LITESTREAM_S3_FORCE_PATH_STYLE` | sometimes | — | `true` for B2 / MinIO. Ignored for `gcs://`. |
 | `GOVERNOR_ALLOW_SINGLE_HOST` | Tier 2 | `false` | Acknowledge running without off-host replication. |
 | `GOVERNOR_ALLOW_EPHEMERAL` | Tier 3 | `false` | Acknowledge running on non-persistent storage (dev only). |
 | **Public read-only view** | | | |
@@ -155,6 +155,27 @@ flyctl secrets set \
   LITESTREAM_S3_REGION=us-west-002
 flyctl deploy
 ```
+
+## Google Cloud Run
+
+A Terraform module + Cloud Build pipeline lives at
+[`deploy/gcp/`](../../deploy/gcp/). It provisions Cloud Run, an Artifact
+Registry repo, a GCS bucket for Litestream, a Secret Manager secret for
+the bootstrap token, and a dedicated runtime service account — then
+hands image rollouts off to Cloud Build so day-2 deploys don't need
+`terraform apply`.
+
+Two GCP-specific notes:
+
+- **Auth is ADC, not HMAC.** When `GOVERNOR_REPLICATION_URL` starts with
+  `gcs://`, the entrypoint skips the `LITESTREAM_ACCESS_KEY_ID` /
+  `_SECRET_ACCESS_KEY` check and Litestream picks up Application Default
+  Credentials from the Cloud Run metadata server. No long-lived keys.
+- **Single instance pinned.** The Terraform sets `min=max=1` and
+  always-allocated CPU. SQLite is single-writer; multiple Cloud Run
+  instances would each get their own ephemeral disk and corrupt the
+  shared replica bucket. See `deploy/gcp/README.md` for the rationale
+  and the exact `gcloud` flags if you'd rather skip Terraform.
 
 ## DigitalOcean App Platform
 

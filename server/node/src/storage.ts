@@ -107,7 +107,8 @@ export function assertDurability(
       'low-stakes use only.',
       '',
       'To upgrade to a durable deployment, set GOVERNOR_REPLICATION_URL',
-      'to an S3-compatible bucket; see server/node/README.md.',
+      'to an S3-compatible (s3://) or GCS (gcs://) bucket; see',
+      'server/node/README.md.',
     ]));
     return;
   }
@@ -146,7 +147,9 @@ export function assertDurability(
           '     GOVERNOR_REPLICATION_URL=s3://your-bucket/governor',
           '     LITESTREAM_ACCESS_KEY_ID=...   LITESTREAM_SECRET_ACCESS_KEY=...',
           '     (Litestream-compatible: AWS S3, Cloudflare R2, Backblaze B2,',
-          '      MinIO, Wasabi, anything S3-API-compatible.)',
+          '      MinIO, Wasabi, anything S3-API-compatible. For Google Cloud',
+          '      use GOVERNOR_REPLICATION_URL=gcs://bucket/path; auth is ADC,',
+          '      no key/secret env vars are needed.)',
           '  2. Accept the single-host risk explicitly:',
           '     GOVERNOR_ALLOW_SINGLE_HOST=true',
         ];

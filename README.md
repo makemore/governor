@@ -191,11 +191,36 @@ Bucket setup takes ~3 minutes:
 R2, S3, MinIO and Wasabi work identically with a different endpoint.
 </details>
 
+<details>
+<summary><b>Google Cloud Run</b> — Terraform + Cloud Build, GCS replica, no HMAC keys</summary>
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/makemore/governor/main/install.sh | sh
+cd governor/deploy/gcp/terraform
+cp terraform.tfvars.example terraform.tfvars   # set project_id, region
+terraform init && terraform apply
+openssl rand -hex 32 \
+  | gcloud secrets versions add governor-bootstrap-token --data-file=-
+gcloud builds submit ../../.. \
+  --config=../cloudbuild.yaml \
+  --substitutions=_REGION=europe-west1,_SERVICE=governor,_REPO=governor
+GOVERNOR_BASE_URL=$(terraform output -raw service_url) \
+GOVERNOR_BOOTSTRAP_TOKEN=<the value you piped above> \
+  gov bootstrap
+```
+
+Litestream replicates to a GCS bucket using Application Default
+Credentials — no HMAC keys to rotate. The Terraform pins the service to
+a single instance with always-allocated CPU, because SQLite is
+single-writer. Full architecture notes in [`deploy/gcp/README.md`](./deploy/gcp/README.md).
+</details>
+
 ### Reference servers
 
 | Target | Runtime | Storage | Durability |
 |---|---|---|---|
 | [Cloudflare Workers](./server/worker) | Workers runtime | D1 (managed, replicated) | ✅ Replicated by the platform |
+| [Google Cloud Run](./deploy/gcp) | Node 20 in Docker | SQLite + Litestream → GCS (native ADC auth) | ✅ Replicated to a bucket in your project |
 | [Self-host / Render / Fly / DigitalOcean / Koyeb / Railway / VM](./server/node) | Node 20 in Docker | SQLite + Litestream → any S3-compatible bucket | ✅ Replicated to a bucket you own |
 
 **Railway** isn't listed above because it requires publishing a one-time

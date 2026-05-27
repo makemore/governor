@@ -28,15 +28,39 @@ if [ -z "${GOVERNOR_REPLICATION_URL:-}" ]; then
   exec node dist/server.js
 fi
 
-# Tier 1: Litestream-wrapped. Credentials are required.
-if [ -z "${LITESTREAM_ACCESS_KEY_ID:-}" ] || [ -z "${LITESTREAM_SECRET_ACCESS_KEY:-}" ]; then
-  echo "========================================================================"
-  echo "  REFUSING TO START: GOVERNOR_REPLICATION_URL is set but credentials"
-  echo "  are missing. Set both LITESTREAM_ACCESS_KEY_ID and"
-  echo "  LITESTREAM_SECRET_ACCESS_KEY (or remove GOVERNOR_REPLICATION_URL"
-  echo "  to fall back to single-host mode)."
-  echo "========================================================================"
-  exit 2
+# Tier 1: Litestream-wrapped. The auth model depends on the URL scheme.
+#
+#   s3://, https://      Generic S3-compatible (AWS, R2, B2, MinIO, Wasabi).
+#                        Requires LITESTREAM_ACCESS_KEY_ID / _SECRET_ACCESS_KEY.
+#   gcs://               Google Cloud Storage, native auth via Application
+#                        Default Credentials (ADC). On Cloud Run / GCE / GKE
+#                        the runtime service account is picked up from the
+#                        metadata server with no key material on disk; locally
+#                        set GOOGLE_APPLICATION_CREDENTIALS to a key file or
+#                        run `gcloud auth application-default login`.
+case "${GOVERNOR_REPLICATION_URL}" in
+  gcs://*)  REPLICA_SCHEME=gcs ;;
+  s3://*|https://*) REPLICA_SCHEME=s3 ;;
+  *)
+    echo "========================================================================"
+    echo "  REFUSING TO START: unsupported GOVERNOR_REPLICATION_URL scheme."
+    echo "  Got: ${GOVERNOR_REPLICATION_URL}"
+    echo "  Supported: s3://, https:// (S3-compatible), gcs:// (Google Cloud)."
+    echo "========================================================================"
+    exit 2
+    ;;
+esac
+
+if [ "$REPLICA_SCHEME" = "s3" ]; then
+  if [ -z "${LITESTREAM_ACCESS_KEY_ID:-}" ] || [ -z "${LITESTREAM_SECRET_ACCESS_KEY:-}" ]; then
+    echo "========================================================================"
+    echo "  REFUSING TO START: GOVERNOR_REPLICATION_URL is set but credentials"
+    echo "  are missing. Set both LITESTREAM_ACCESS_KEY_ID and"
+    echo "  LITESTREAM_SECRET_ACCESS_KEY (or remove GOVERNOR_REPLICATION_URL"
+    echo "  to fall back to single-host mode)."
+    echo "========================================================================"
+    exit 2
+  fi
 fi
 
 CONFIG=/tmp/litestream.yml
@@ -45,16 +69,20 @@ CONFIG=/tmp/litestream.yml
   echo "  - path: ${DB_PATH}"
   echo "    replicas:"
   echo "      - url: ${GOVERNOR_REPLICATION_URL}"
-  # Optional knobs for non-AWS S3-compatible providers (R2, B2, MinIO, ...).
-  if [ -n "${LITESTREAM_S3_ENDPOINT:-}" ]; then
-    echo "        endpoint: ${LITESTREAM_S3_ENDPOINT}"
+  if [ "$REPLICA_SCHEME" = "s3" ]; then
+    # Optional knobs for non-AWS S3-compatible providers (R2, B2, MinIO, ...).
+    if [ -n "${LITESTREAM_S3_ENDPOINT:-}" ]; then
+      echo "        endpoint: ${LITESTREAM_S3_ENDPOINT}"
+    fi
+    if [ -n "${LITESTREAM_S3_REGION:-}" ]; then
+      echo "        region: ${LITESTREAM_S3_REGION}"
+    fi
+    if [ -n "${LITESTREAM_S3_FORCE_PATH_STYLE:-}" ]; then
+      echo "        force-path-style: ${LITESTREAM_S3_FORCE_PATH_STYLE}"
+    fi
   fi
-  if [ -n "${LITESTREAM_S3_REGION:-}" ]; then
-    echo "        region: ${LITESTREAM_S3_REGION}"
-  fi
-  if [ -n "${LITESTREAM_S3_FORCE_PATH_STYLE:-}" ]; then
-    echo "        force-path-style: ${LITESTREAM_S3_FORCE_PATH_STYLE}"
-  fi
+  # gcs:// needs no extra config keys; the Litestream GCS client reads
+  # ADC at startup. See https://litestream.io/guides/gcs/.
 } > "$CONFIG"
 
 # Restore the DB from the remote replica only if there is no local copy

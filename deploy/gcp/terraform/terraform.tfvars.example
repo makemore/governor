@@ -1,0 +1,13 @@
+// Copy to terraform.tfvars (gitignored) and edit.
+
+project_id            = "your-gcp-project-id"
+region                = "europe-west1"
+bucket_location       = "EUROPE-WEST1"
+service_name          = "governor"
+
+// Leave the placeholder image for the first apply; the cloudbuild.yaml
+// pipeline pushes a real image and switches the live revision afterwards.
+// image = "europe-west1-docker.pkg.dev/your-gcp-project-id/governor/governor:latest"
+
+public_view_enabled   = false
+allow_unauthenticated = false
