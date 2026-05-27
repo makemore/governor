@@ -11,3 +11,13 @@ service_name          = "governor"
 
 public_view_enabled   = false
 allow_unauthenticated = false
+
+// ---- Identity-Aware Proxy (optional) ----
+// Set iap_enabled = true to put Google sign-in in front of the service.
+// project_number is required when iap_enabled = true; find it with:
+//   gcloud projects describe your-gcp-project-id --format='value(projectNumber)'
+// The OAuth consent screen must already be configured in the Cloud Console.
+//
+// project_number = "123456789012"
+// iap_enabled    = true
+// iap_members    = ["user:you@example.com"]

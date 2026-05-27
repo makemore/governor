@@ -1,0 +1,5 @@
+// Copy to terraform.tfvars (gitignored) and edit.
+project_id   = "your-gcp-project-id"
+region       = "europe-west2"
+service_name = "governor"
+domain       = "gov.example.com"

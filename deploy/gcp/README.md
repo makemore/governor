@@ -109,6 +109,70 @@ container's entrypoint runs `litestream restore -if-replica-exists
 -if-db-not-exists` before opening the DB. Worst-case data loss is the
 last unflushed WAL frame (sub-second under normal load).
 
+## Identity-Aware Proxy (optional)
+
+You can put Google sign-in in front of the Cloud Run URL with no load
+balancer required: Cloud Run has native IAP integration (GA April 2025).
+This is the simplest way to keep the service private to your Workspace
+domain or a specific group of users without writing any auth code.
+
+### Prerequisite: OAuth consent screen
+
+IAP authenticates against a project-level OAuth consent screen. Google
+turned down the OAuth Admin APIs in March 2026, so this is a console-only
+one-time step:
+
+1. Open **APIs & Services → OAuth consent screen** in the Cloud Console.
+2. If the project lives inside a Google Workspace organization, choose
+   **Internal** user type — IAP will then auto-restrict to your domain
+   and no Google verification is required.
+3. Set the app name and a support email; you can skip scopes and test
+   users entirely for IAP-only usage.
+
+### Enable IAP via Terraform
+
+Find your project number (not the project ID) and add the IAP block to
+`terraform.tfvars`:
+
+```sh
+gcloud projects describe $PROJECT_ID --format='value(projectNumber)'
+```
+
+```hcl
+project_number = "123456789012"
+iap_enabled    = true
+iap_members    = ["user:you@example.com"]   # or group:eng@example.com, domain:example.com
+```
+
+Then `terraform apply`. The module enables the IAP API, flips
+`iap_enabled` on the Cloud Run service, grants `roles/run.invoker` to
+the IAP service agent, and grants `roles/iap.httpsResourceAccessor` to
+each listed member.
+
+> **Heads-up on the project_number vs project_id quirk:** the underlying
+> `google_iap_web_cloud_run_service_iam_member` resource silently no-ops
+> when given a project ID instead of the numeric project number
+> ([hashicorp/terraform-provider-google#23092][iap-bug]). The module
+> guards against this with a precondition.
+
+[iap-bug]: https://github.com/hashicorp/terraform-provider-google/issues/23092
+
+### Verify
+
+```sh
+# Unauthenticated request: should be a 302 to accounts.google.com.
+curl -sI "$(terraform output -raw service_url)" | head -5
+
+# Authenticated via your own identity token: should be 200 (API key still
+# required for the actual Governor endpoints, this just proves IAP let
+# you through).
+curl -sI -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  "$(terraform output -raw service_url)/healthz"
+```
+
+In a browser, opening the service URL should redirect through the
+Google sign-in flow and land on the Governor UI.
+
 ## Cost shape (rough)
 
 - **Cloud Run** ~ $10–15/month for one always-on CPU + 512 Mi
@@ -127,8 +191,9 @@ trade-offs in `governor/server/node/README.md` first.
 - **Cloud SQL.** The storage layer is SQLite; switching to Postgres is
   an engineering project, not a deploy choice. If you need multi-writer
   or multi-region active-active, that's the door.
-- **Cloud Load Balancing / Cloud Armor / IAP.** Useful in front of a
+- **Cloud Load Balancing / Cloud Armor.** Useful in front of a
   production service but orthogonal to the Governor app itself. Add
-  them per your org's perimeter policy.
+  them per your org's perimeter policy. (For lightweight access control,
+  IAP — covered above — is usually enough on its own.)
 - **Remote tfstate backend.** Defaults to local state; flip to a GCS
   backend when more than one operator manages the deployment.

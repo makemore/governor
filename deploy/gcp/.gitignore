@@ -5,3 +5,10 @@ terraform/terraform.tfstate.*
 terraform/terraform.tfvars
 terraform/*.auto.tfvars
 terraform/crash.log
+
+terraform/lb/.terraform/
+terraform/lb/.terraform.lock.hcl
+terraform/lb/terraform.tfstate
+terraform/lb/terraform.tfstate.*
+terraform/lb/terraform.tfvars
+terraform/lb/*.auto.tfvars

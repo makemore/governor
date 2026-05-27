@@ -22,3 +22,8 @@ output "bootstrap_token_secret" {
   description = "Secret Manager secret holding GOVERNOR_BOOTSTRAP_TOKEN. Add a version with `gcloud secrets versions add`."
   value       = google_secret_manager_secret.bootstrap_token.secret_id
 }
+
+output "iap_enabled" {
+  description = "Whether IAP is gating the service. When true, the run.app URL requires Google sign-in."
+  value       = var.iap_enabled
+}

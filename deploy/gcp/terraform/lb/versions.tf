@@ -2,9 +2,7 @@ terraform {
   required_version = ">= 1.5.0"
   required_providers {
     google = {
-      source = "hashicorp/google"
-      // 7.x is required for the GA iap_enabled attribute on
-      // google_cloud_run_v2_service (promoted to GA Feb 2026).
+      source  = "hashicorp/google"
       version = ">= 7.0, < 8.0"
     }
   }
