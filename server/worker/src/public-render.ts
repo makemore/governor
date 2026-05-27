@@ -9,6 +9,7 @@ import {
   type PublicConfig,
   type SubjectView,
 } from './public.js';
+import { FACE_OK, FACE_PENDING, FACE_CYCLE } from './_gov-faces.js';
 
 export function renderPublicPage(
   cfg: PublicConfig,
@@ -56,8 +57,8 @@ function renderStyle(accent: string): string {
 body{font:15px/1.55 ui-sans-serif,-apple-system,system-ui,sans-serif;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased}
 main{max-width:760px;margin:0 auto;padding:56px 24px 80px}
 .brandbar{display:flex;align-items:center;gap:14px;margin:0 0 36px;padding-bottom:20px;border-bottom:1px solid var(--rule)}
-.brandbar .logo{width:36px;height:36px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font:700 18px/1 ui-sans-serif,sans-serif;overflow:hidden}
-.brandbar .logo img,.brandbar .logo svg{width:100%;height:100%;object-fit:cover}
+.brandbar .logo{width:40px;height:40px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font:700 18px/1 ui-sans-serif,sans-serif;overflow:hidden}
+.brandbar .logo img,.brandbar .logo svg{width:100%;height:100%;display:block;object-fit:cover}
 .brandbar h1{font:600 18px/1.2 ui-sans-serif,sans-serif;margin:0}
 .brandbar .sub{color:var(--muted);font-size:13px;margin:2px 0 0}
 .banner{background:var(--brand-soft);border:1px solid var(--rule);border-radius:10px;padding:20px 22px;margin:0 0 36px;display:flex;align-items:center;gap:14px}
@@ -74,9 +75,10 @@ h3{font:600 11px/1 ui-sans-serif,sans-serif;letter-spacing:.1em;text-transform:u
 .pill.allow{background:color-mix(in srgb,var(--allow) 14%,transparent);color:var(--allow)}
 .pill.deny{background:color-mix(in srgb,var(--deny) 14%,transparent);color:var(--deny)}
 ul.rules{list-style:none;padding:0;margin:0;font-size:13px}
-ul.rules li{display:flex;gap:10px;padding:6px 0;align-items:baseline}
-ul.rules .mk{font:14px/1 ui-monospace,Menlo,monospace;width:14px;flex:0 0 auto}
-ul.rules .ok .mk{color:var(--allow)}ul.rules .no .mk{color:var(--muted)}
+ul.rules li{display:flex;gap:12px;padding:8px 0;align-items:center}
+ul.rules .mk{width:22px;height:22px;flex:0 0 auto;border-radius:4px;overflow:hidden}
+ul.rules .mk svg{width:100%;height:100%;display:block}
+ul.rules .no .mk{opacity:.75}
 ul.rules .lab{flex:1}ul.rules .by{color:var(--muted);font-size:12px}
 .timeline{list-style:none;padding:0;margin:0;font-size:13px}
 .timeline li{display:grid;grid-template-columns:84px 14px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--rule);align-items:baseline}
@@ -90,9 +92,11 @@ footer a{color:inherit}
 }
 
 function renderHeader(cfg: PublicConfig): string {
+  // Custom logos win; otherwise the animated gov face cycles through eight
+  // emotions over 12s, giving the page a quiet sign of life.
   const logo = cfg.logoUrl
     ? `<img alt="" src="${escape(cfg.logoUrl)}">`
-    : escape(cfg.brandName.slice(0, 1).toUpperCase());
+    : FACE_CYCLE;
   return `<div class="brandbar"><div class="logo">${logo}</div><div>` +
     `<h1>${escape(cfg.brandName)} · ${escape(cfg.title)}</h1>` +
     `<p class="sub">${escape(cfg.tagline)}</p></div></div>`;
@@ -110,11 +114,11 @@ function renderSubject(cfg: PublicConfig, s: SubjectView, nowMs: number): string
     `<div class="when">${escape(relativeTime(s.createdAt, nowMs))}</div></div>` +
     `<ul class="rules">${s.items.map((i) => {
       const ok = i.satisfied ? 'ok' : 'no';
-      const mk = i.satisfied ? '✓' : '◯';
+      const face = i.satisfied ? FACE_OK : FACE_PENDING;
       const by = i.attestations.length === 0
         ? 'awaiting attestation'
         : i.attestations.map((a) => actorBlurb(cfg, a.actorKind, a.displayName, a.attestedAt, nowMs)).join(', ');
-      return `<li class="${ok}"><span class="mk">${mk}</span>` +
+      return `<li class="${ok}"><span class="mk" aria-label="${i.satisfied ? 'satisfied' : 'pending'}">${face}</span>` +
         `<span class="lab">${escape(i.key)}</span><span class="by">${by}</span></li>`;
     }).join('')}</ul></div>`;
 }

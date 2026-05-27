@@ -15,12 +15,18 @@
 //
 // Keep CSS in sync with server/{node,worker}/src/public-render.ts. The
 // markup here is a snapshot for the README; the live page is canonical.
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ACCENT = '#1f6f5c';
+
+// Generated face icons used by the live page. Regenerate via
+// `node brand/build-face-cycle.mjs` after changing the emotion set.
+const FACES = JSON.parse(readFileSync(join(here, '..', '..', 'server', 'worker', 'src', '_gov-faces.ts'), 'utf8')
+  .replace(/^[\s\S]*?export const FACE_OK = (".*?");[\s\S]*?export const FACE_PENDING = (".*?");[\s\S]*?export const FACE_CYCLE = (".*?");[\s\S]*$/,
+    (_, a, b, c) => `{"ok":${a},"pending":${b},"cycle":${c}}`));
 
 const STYLE_VARS_LIGHT =
   `--fg:#1c1410;--bg:#fffbf6;--muted:#7a6a5e;--rule:#efe3d4;--code-bg:#f6ede1;` +
@@ -36,7 +42,8 @@ function style(vars) {
 body{font:15px/1.55 ui-sans-serif,-apple-system,system-ui,sans-serif;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased}
 main{max-width:760px;margin:0 auto;padding:56px 24px 80px}
 .brandbar{display:flex;align-items:center;gap:14px;margin:0 0 36px;padding-bottom:20px;border-bottom:1px solid var(--rule)}
-.brandbar .logo{width:36px;height:36px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font:700 18px/1 ui-sans-serif,sans-serif;overflow:hidden}
+.brandbar .logo{width:40px;height:40px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font:700 18px/1 ui-sans-serif,sans-serif;overflow:hidden}
+.brandbar .logo img,.brandbar .logo svg{width:100%;height:100%;display:block;object-fit:cover}
 .brandbar h1{font:600 18px/1.2 ui-sans-serif,sans-serif;margin:0}
 .brandbar .sub{color:var(--muted);font-size:13px;margin:2px 0 0}
 .banner{background:var(--brand-soft);border:1px solid var(--rule);border-radius:10px;padding:20px 22px;margin:0 0 36px;display:flex;align-items:center;gap:14px}
@@ -53,9 +60,10 @@ h3{font:600 11px/1 ui-sans-serif,sans-serif;letter-spacing:.1em;text-transform:u
 .pill.allow{background:color-mix(in srgb,var(--allow) 14%,transparent);color:var(--allow)}
 .pill.deny{background:color-mix(in srgb,var(--deny) 14%,transparent);color:var(--deny)}
 ul.rules{list-style:none;padding:0;margin:0;font-size:13px}
-ul.rules li{display:flex;gap:10px;padding:6px 0;align-items:baseline}
-ul.rules .mk{font:14px/1 ui-monospace,Menlo,monospace;width:14px;flex:0 0 auto}
-ul.rules .ok .mk{color:var(--allow)}ul.rules .no .mk{color:var(--muted)}
+ul.rules li{display:flex;gap:12px;padding:8px 0;align-items:center}
+ul.rules .mk{width:22px;height:22px;flex:0 0 auto;border-radius:4px;overflow:hidden}
+ul.rules .mk svg{width:100%;height:100%;display:block}
+ul.rules .no .mk{opacity:.75}
 ul.rules .lab{flex:1}ul.rules .by{color:var(--muted);font-size:12px}
 .timeline{list-style:none;padding:0;margin:0;font-size:13px}
 .timeline li{display:grid;grid-template-columns:84px 14px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--rule);align-items:baseline}
@@ -68,7 +76,7 @@ footer a{color:inherit}
 </style>`;
 }
 
-const HEADER = `<div class="brandbar"><div class="logo">A</div><div>
+const HEADER = `<div class="brandbar"><div class="logo">${FACES.cycle}</div><div>
   <h1>Acme Robotics · Release sign-off</h1>
   <p class="sub">Who approved which release, and when.</p>
 </div></div>`;
@@ -78,8 +86,8 @@ const BANNER = `<div class="banner warn"><span class="dot"></span><div>
 </div></div>`;
 
 function item(ok, key, by) {
-  const cls = ok ? 'ok' : 'no'; const mk = ok ? '✓' : '◯';
-  return `<li class="${cls}"><span class="mk">${mk}</span><span class="lab">${key}</span><span class="by">${by}</span></li>`;
+  const cls = ok ? 'ok' : 'no'; const face = ok ? FACES.ok : FACES.pending;
+  return `<li class="${cls}"><span class="mk">${face}</span><span class="lab">${key}</span><span class="by">${by}</span></li>`;
 }
 
 const SUBJECTS = `<h3>Tracked subjects</h3>

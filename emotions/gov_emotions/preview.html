@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>gov emotion suite</title>
+<style>
+  :root { --bg: #f4f1ea; --fg: #1a1a1a; --muted: #6b6b6b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 40px 32px; background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, sans-serif; }
+  h1 { font-size: 18px; font-weight: 500; margin: 0 0 4px; }
+  p.sub { margin: 0 0 32px; color: var(--muted); font-size: 13px; }
+  .stage { display: flex; align-items: center; gap: 32px; margin-bottom: 48px; }
+  .stage svg { width: 200px; height: 200px; }
+  .label { font-size: 14px; color: var(--muted); min-width: 140px; }
+  .controls { display: flex; gap: 8px; align-items: center; }
+  button { font: inherit; font-size: 13px; padding: 6px 12px; border: 1px solid #1a1a1a; background: white; color: #1a1a1a; cursor: pointer; border-radius: 4px; }
+  button:hover { background: #1a1a1a; color: white; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 16px; }
+  .tile { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+  .tile svg { width: 90px; height: 90px; transition: transform 0.15s ease; }
+  .tile:hover svg { transform: scale(1.06); }
+  .tile .name { font-size: 11px; color: var(--muted); }
+  .tile.active .name { color: var(--fg); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<h1>gov emotion suite</h1>
+<p class="sub">click any tile to load it into the stage. or hit play to cycle.</p>
+
+<div class="stage">
+  <div id="stage-svg"></div>
+  <div>
+    <div class="label" id="stage-label">—</div>
+    <div class="controls">
+      <button id="play">▶ play</button>
+      <button id="prev">← prev</button>
+      <button id="next">next →</button>
+    </div>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const FILES = [
+  ["01_default","default"],
+  ["02_furious","furious"],
+  ["03_disapproving","disapproving"],
+  ["04_unimpressed","unimpressed"],
+  ["05_sceptical","sceptical"],
+  ["06_smug","smug"],
+  ["07_surprised","surprised"],
+  ["08_shocked","shocked"],
+  ["09_confused","confused"],
+  ["10_questioning","questioning"],
+  ["11_thinking","thinking"],
+  ["12_side_eye","side eye"],
+  ["13_worried","worried"],
+  ["14_sad","sad"],
+  ["15_resigned","resigned"],
+  ["16_asleep","asleep"],
+  ["17_dead_inside","dead inside"],
+  ["18_pleased","pleased"],
+  ["19_smiling","smiling"],
+  ["20_cheeky","cheeky"],
+  ["21_grinning","grinning"],
+  ["22_silenced","silenced"],
+  ["23_greedy","greedy"],
+  ["24_lovestruck","lovestruck"],
+  ["25_unibrow_rage","unibrow rage"],
+  ["26_speechless","speechless"]
+];
+
+const grid = document.getElementById("grid");
+const stageSvg = document.getElementById("stage-svg");
+const stageLabel = document.getElementById("stage-label");
+const playBtn = document.getElementById("play");
+let current = 0;
+let playing = false;
+let timer = null;
+
+async function loadSvg(slug) {
+  const r = await fetch(`svgs/gov_${slug}.svg`);
+  return await r.text();
+}
+
+async function setStage(idx) {
+  current = (idx + FILES.length) % FILES.length;
+  const [slug, label] = FILES[current];
+  stageSvg.innerHTML = await loadSvg(slug);
+  stageLabel.textContent = label;
+  document.querySelectorAll(".tile").forEach((t, i) => t.classList.toggle("active", i === current));
+}
+
+async function build() {
+  for (const [slug, label] of FILES) {
+    const svg = await loadSvg(slug);
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.innerHTML = svg + `<div class="name">${label}</div>`;
+    tile.addEventListener("click", () => setStage(FILES.findIndex(f => f[0] === slug)));
+    grid.appendChild(tile);
+  }
+  setStage(0);
+}
+
+playBtn.addEventListener("click", () => {
+  playing = !playing;
+  playBtn.textContent = playing ? "⏸ pause" : "▶ play";
+  if (playing) {
+    timer = setInterval(() => setStage(current + 1), 600);
+  } else {
+    clearInterval(timer);
+  }
+});
+document.getElementById("prev").addEventListener("click", () => setStage(current - 1));
+document.getElementById("next").addEventListener("click", () => setStage(current + 1));
+
+build();
+</script>
+
+</body>
+</html>
