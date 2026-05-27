@@ -5,14 +5,34 @@
   </picture>
 </p>
 
-An append-only, multi-party attestation log with a rule evaluator over it.
-Designed to be embedded, self-hosted, or consumed as a hosted service.
+**An honest record of who signed off on what, before it ships.**
 
-> **Status: pre-release.** The spec is being drafted; the reference
-> implementation is being extracted from an existing project. Wire formats
-> and APIs may change without notice until `v0.1.0`.
+Releases, deployments, model promotions, policy changes — anything that
+should require more than one set of eyes — get a shared checklist.
+People, CI systems, and AI agents each check the boxes they're
+responsible for, in their own name. The result is a page anyone can read.
 
-## What it looks like
+No one can move the bar after work has started. No one can sign on
+someone else's behalf. Nothing gets quietly forgotten in a Slack thread.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./brand/screenshots/public-dark.png">
+    <img src="./brand/screenshots/public-light.png" alt="The Governor public sign-off page, showing two releases and an infrastructure change with their checklists and recent attestations." width="720">
+  </picture>
+  <br><sub><i>The public page anyone can link to — what your auditor, your security team, and your CEO actually see.</i></sub>
+</p>
+
+## Who it's for
+
+- **Release managers** tired of chasing approvals across Slack, email, and tickets.
+- **Security and compliance teams** who need a clean audit trail without owning a heavyweight workflow tool.
+- **CI systems and AI agents** that need to attest to things they did, in a way humans can later verify.
+- **Auditors and execs** who want to glance at one page and know what's been signed off, by whom, and when.
+
+## How it feels from the command line
+
+Two commands, one round trip each:
 
 ```console
 $ gov gate myapp@v1.4.0
@@ -31,9 +51,13 @@ $ gov attest myapp@v1.4.0 security-review --note "no new deps; secrets unchanged
   ── decision: ALLOW · 4 of 4 satisfied ───────────────────────────────────
 ```
 
-Two commands, one round trip each. The gate is a function of attestations
-and a checklist that was pinned before work started; no party can move the
-bar or sign on another's behalf.
+The gate is a function of attestations and a checklist that was pinned
+before work started. Drop `gov gate ... && deploy` into any pipeline and
+the deploy can't run until the checklist is satisfied.
+
+> **Pre-release.** Wire formats and APIs may still shift before `v0.1.0`.
+> The spec lives in [`spec/`](./spec); breaking changes will be called out
+> in release notes.
 
 ## Layout
 
