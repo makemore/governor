@@ -36,3 +36,12 @@ Thumbs.db
 # Local env
 .env
 .env.local
+
+# Terraform (state + per-environment var files hold project-specific values)
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.*
+terraform.tfstate.d/
+*.tfvars
+!*.tfvars.example
