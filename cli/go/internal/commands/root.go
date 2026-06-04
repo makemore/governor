@@ -35,6 +35,7 @@ func NewRoot() *cobra.Command {
 		newRunsCmd(),
 		newAttestCmd(),
 		newGateCmd(),
+		newReportCmd(),
 		newLLMsCmd(),
 	)
 	return root

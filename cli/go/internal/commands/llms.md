@@ -81,8 +81,13 @@ A run is created from a checklist plus a subject:
 ## The CLI (`gov`)
 
 Connection profiles ("personas") are stored in a `0600` TOML file as
-`{name, base_url, api_key}`. Select one per command with `-p/--persona` or
-`$GOVERNOR_PERSONA`; otherwise the default persona is used.
+`{name, base_url, api_key}` plus, for deployments behind Google Identity-Aware
+Proxy (IAP), `{iap_audience, iap_service_account}`. When those are set the CLI
+mints a Google OIDC token and sends it in `Authorization` (IAP consumes it),
+carrying the Governor bearer in `X-Governor-Authorization`. **You do not handle
+IAP tokens yourself** — `gov` does it for every command, including `report`.
+Select a persona per command with `-p/--persona` or `$GOVERNOR_PERSONA`;
+otherwise the default persona is used.
 
 | Command | Purpose |
 |---|---|
@@ -93,9 +98,54 @@ Connection profiles ("personas") are stored in a `0600` TOML file as
 | `gov tokens mint <actor-id> [--save-as <name>]` | Admin: mint a bearer token. |
 | `gov runs new <file.json>` | Open a run from a checklist file (`-` for stdin). |
 | `gov runs show <run-id>` | Print a run and its attestations as JSON. |
-| `gov attest <run-id> <item-key> [-n note]` | Append-only signature on one item. |
+| `gov attest <run-id> <item-key> [flags]` | Append-only signature on one item (see below). |
 | `gov gate <run-id> [-q]` | Evaluate the gate; exit 0 = allow, 1 = deny. |
+| `gov report [run-id] [flags]` | Download an md/html/pdf report (see below). |
 | `gov llms` | Print this document. |
+
+## Attestations: outcome, evidence, and the fail→pass chain
+
+An attestation is more than a yes. Record it honestly and richly:
+
+- `-o/--outcome` — `pass` (default), `fail`, or `waived`. A `fail` **never**
+  satisfies the gate; a `waived` is a deliberate sign-off that does.
+- `--severity` — `info`, `low`, `medium`, `high`, or `critical`.
+- `-n/--note` — one-line summary. `-d/--detail` — long-form findings, verbatim.
+- `-e/--evidence` — structured proof, **repeatable**. A bare URL is shorthand
+  for `kind=url`; otherwise pass `key=value` pairs:
+  - `-e https://ci.example/run/42`
+  - `-e kind=hash,content_hash=sha256:ab…,media_type=application/zip`
+
+Attestations are append-only, so progress is a **chain**: attest `fail` first,
+then re-attest `pass` once fixed. Every attestation has a **stable id**, printed
+by `gov attest` (`id:`) and shown in `gov runs show`. The same id appears in
+every report you export over time, so a `fail` in last week's report and the
+`pass` that replaced it are linkable by id — that is the audit trail.
+
+## Reports (`gov report`)
+
+`gov report` downloads a signed, human-readable report using the active persona
+— **including its IAP token** — so authenticated deployments need no manual
+token minting, redirects, or headless-browser scripting. If a request is
+bounced to a sign-in page, `gov` detects it and fails with a clear message
+instead of silently saving a login page.
+
+- `gov report <run-id>` — one run. `gov report` (no id) — all recent runs.
+- `-f/--format md|html|pdf` (default `pdf`). PDF is rendered locally via
+  auto-detected headless Chrome/Chromium (override with `--chrome` or
+  `$GOV_CHROME`); if none is found, fetch `-f html` and convert it yourself.
+- `--history full|passing` — `full` (default) is the whole append-only chain
+  incl. superseded fails with `supersedes` links; `passing` is the clean
+  pass/waived-only record.
+- `-o/--out <file>` — output path; `-` is stdout (md/html only). Omit it and
+  the report is written to its own server-suggested filename.
+
+```sh
+gov report <run-id>                      # full-chain audit PDF for one run
+gov report <run-id> --history passing    # clean "what was signed off" PDF
+gov report -f md <run-id> -o -           # markdown to stdout, for piping
+gov report --history passing             # one PDF across all runs
+```
 
 ## Exit codes
 
@@ -117,6 +167,7 @@ gov attest <run-id> code-review -n "diff LGTM"
 GOVERNOR_PERSONA=ci gov attest <run-id> tests-green -n "build 482 green"
 gov gate <run-id>                          # exit 0 allow / exit 1 deny
 gov runs show <run-id>                      # full run + attestations (JSON)
+gov report <run-id> --history passing      # clean PDF of what was signed off
 ```
 
 ## Rules of engagement for you, the agent

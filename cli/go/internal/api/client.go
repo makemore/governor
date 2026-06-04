@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -172,4 +174,109 @@ func (c *Client) Gate(ctx context.Context, runID string) (*GateDecision, error) 
 		return nil, err
 	}
 	return &g, nil
+}
+
+// RawDoc is a non-JSON document fetched from the server (e.g. a Markdown or
+// HTML report). Filename is the server's suggested name parsed from the
+// Content-Disposition header; it is empty when the server sends none.
+type RawDoc struct {
+	Body        []byte
+	ContentType string
+	Filename    string
+}
+
+// GetRaw fetches a document at an absolute server path (e.g. "/report.md"),
+// authenticating exactly like do() — IAP ProxyToken in Authorization with the
+// Governor bearer in X-Governor-Authorization, or the bearer in Authorization
+// when there is no IAP in front.
+//
+// Auto-redirects are disabled so an IAP/identity-provider sign-in bounce is
+// caught and reported as an auth error rather than silently returning a Google
+// login page with a 200 — the exact trap a naive curl falls into.
+func (c *Client) GetRaw(ctx context.Context, path, accept string) (*RawDoc, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	if accept != "" {
+		req.Header.Set("Accept", accept)
+	}
+	if c.ProxyToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.ProxyToken)
+		if c.Token != "" {
+			req.Header.Set("X-Governor-Authorization", "Bearer "+c.Token)
+		}
+	} else if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+
+	// Copy the client so we can stop redirects for this request only.
+	cl := *c.HTTP
+	cl.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := cl.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if loc := resp.Header.Get("Location"); resp.StatusCode >= 300 && resp.StatusCode < 400 && loc != "" {
+		if isAuthRedirect(loc) {
+			return nil, fmt.Errorf(
+				"request was redirected to a sign-in page (%s) — the persona's IAP token is missing or invalid; check `iap_audience`/`iap_service_account` and that you can impersonate the service account",
+				authHost(loc))
+		}
+		return nil, fmt.Errorf("unexpected redirect to %s (status %d)", loc, resp.StatusCode)
+	}
+
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		apiErr := &APIError{Status: resp.StatusCode}
+		_ = json.Unmarshal(raw, apiErr)
+		if apiErr.Code == "" {
+			apiErr.Code = fmt.Sprintf("http-%d", resp.StatusCode)
+		}
+		if apiErr.Message == "" && len(raw) > 0 && len(raw) < 512 {
+			apiErr.Message = strings.TrimSpace(string(raw))
+		}
+		return nil, apiErr
+	}
+	return &RawDoc{
+		Body:        raw,
+		ContentType: resp.Header.Get("Content-Type"),
+		Filename:    filenameFromDisposition(resp.Header.Get("Content-Disposition")),
+	}, nil
+}
+
+// filenameFromDisposition extracts the filename from a Content-Disposition
+// header, returning "" when absent or unparseable.
+func filenameFromDisposition(cd string) string {
+	if cd == "" {
+		return ""
+	}
+	if _, params, err := mime.ParseMediaType(cd); err == nil {
+		if fn := params["filename"]; fn != "" {
+			return fn
+		}
+	}
+	return ""
+}
+
+// isAuthRedirect reports whether a Location points at a known identity
+// provider sign-in surface (Google account chooser / IAP refresh).
+func isAuthRedirect(loc string) bool {
+	h := authHost(loc)
+	return strings.Contains(h, "accounts.google.com") ||
+		strings.Contains(h, "iap.googleapis.com") ||
+		strings.HasSuffix(h, ".cloud.google.com") ||
+		strings.Contains(loc, "/_gcp_iap/")
+}
+
+func authHost(loc string) string {
+	if u, err := url.Parse(loc); err == nil {
+		return strings.ToLower(u.Host)
+	}
+	return loc
 }
