@@ -2,7 +2,7 @@
  * Public read-only status view. Opt-in via GOVERNOR_PUBLIC_ENABLED=true.
  * Mirrors server/worker/src/public.ts; only the storage calls differ.
  */
-import { gateRun, loadRun } from './runs.js';
+import { gateRun, loadRun, type EvidenceItem } from './runs.js';
 import type { Db } from './storage.js';
 import type { Config } from './types.js';
 
@@ -39,10 +39,23 @@ export interface ActivityRow {
   actor_kind: string;
   actor_display_name: string;
   note: string | null;
+  outcome: string | null;
   attested_at: string;
   subject_id: string;
   subject_label: string | null;
   checklist_title: string | null;
+}
+
+export interface AttestationView {
+  id: string;
+  actorKind: string;
+  displayName: string;
+  attestedAt: string;
+  outcome: string;
+  severity: string | null;
+  note: string | null;
+  detail: string | null;
+  evidence: EvidenceItem[] | null;
 }
 
 export interface SubjectView {
@@ -58,8 +71,47 @@ export interface SubjectView {
     key: string;
     description: string | null;
     satisfied: boolean;
-    attestations: { actorKind: string; displayName: string; attestedAt: string }[];
+    attestations: AttestationView[];
   }[];
+}
+
+export function buildSubjectView(db: Db, runId: string): SubjectView | null {
+  const bundle = loadRun(db, runId);
+  if (!bundle) return null;
+  const gate = gateRun(db, bundle);
+  const attsByItem = new Map<string, typeof bundle.attestations>();
+  for (const a of bundle.attestations) {
+    const list = attsByItem.get(a.item_key) ?? [];
+    list.push(a);
+    attsByItem.set(a.item_key, list);
+  }
+  const satisfiedKeys = new Set(gate.items.filter((i) => i.satisfied).map((i) => i.key));
+  return {
+    runId: bundle.run.id,
+    subjectId: bundle.run.subject_id,
+    subjectLabel: bundle.run.subject_label,
+    checklistTitle: bundle.run.checklist_title,
+    createdAt: bundle.run.created_at,
+    decision: gate.decision,
+    totalItems: gate.summary.items_total,
+    satisfiedItems: gate.summary.items_satisfied,
+    items: bundle.items.map((i) => ({
+      key: i.key,
+      description: i.description,
+      satisfied: satisfiedKeys.has(i.key),
+      attestations: (attsByItem.get(i.key) ?? []).map((a) => ({
+        id: a.id,
+        actorKind: a.actor_kind,
+        displayName: a.actor_display_name,
+        attestedAt: a.attested_at,
+        outcome: a.outcome ?? 'pass',
+        severity: a.severity,
+        note: a.note,
+        detail: a.detail,
+        evidence: a.evidence ? (JSON.parse(a.evidence) as EvidenceItem[]) : null,
+      })),
+    })),
+  };
 }
 
 export function loadRecentSubjects(db: Db, limit: number): SubjectView[] {
@@ -68,36 +120,8 @@ export function loadRecentSubjects(db: Db, limit: number): SubjectView[] {
     .all(limit) as { id: string }[];
   const out: SubjectView[] = [];
   for (const r of rows) {
-    const bundle = loadRun(db, r.id);
-    if (!bundle) continue;
-    const gate = gateRun(db, bundle);
-    const attsByItem = new Map<string, typeof bundle.attestations>();
-    for (const a of bundle.attestations) {
-      const list = attsByItem.get(a.item_key) ?? [];
-      list.push(a);
-      attsByItem.set(a.item_key, list);
-    }
-    const satisfiedKeys = new Set(gate.items.filter((i) => i.satisfied).map((i) => i.key));
-    out.push({
-      runId: bundle.run.id,
-      subjectId: bundle.run.subject_id,
-      subjectLabel: bundle.run.subject_label,
-      checklistTitle: bundle.run.checklist_title,
-      createdAt: bundle.run.created_at,
-      decision: gate.decision,
-      totalItems: gate.summary.items_total,
-      satisfiedItems: gate.summary.items_satisfied,
-      items: bundle.items.map((i) => ({
-        key: i.key,
-        description: i.description,
-        satisfied: satisfiedKeys.has(i.key),
-        attestations: (attsByItem.get(i.key) ?? []).map((a) => ({
-          actorKind: a.actor_kind,
-          displayName: a.actor_display_name,
-          attestedAt: a.attested_at,
-        })),
-      })),
-    });
+    const view = buildSubjectView(db, r.id);
+    if (view) out.push(view);
   }
   return out;
 }
@@ -107,7 +131,7 @@ export function loadRecentActivity(db: Db, limit: number): ActivityRow[] {
     .prepare(
       `SELECT a.id AS attestation_id, a.run_id, a.item_key,
               ac.kind AS actor_kind, ac.display_name AS actor_display_name,
-              a.note, a.attested_at,
+              a.note, a.outcome, a.attested_at,
               r.subject_id, r.subject_label, r.checklist_title
        FROM attestations a
        JOIN actors ac ON ac.id = a.actor_id

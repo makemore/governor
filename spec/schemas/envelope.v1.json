@@ -30,7 +30,17 @@
       }
     },
     "attested_at": { "type": "string", "format": "date-time" },
+    "outcome": {
+      "type": "string",
+      "enum": ["pass", "fail", "waived"],
+      "description": "What this sweep found. 'pass' and 'waived' satisfy the rule; 'fail' is recorded but never satisfies the gate. Absent is treated as 'pass'."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "low", "medium", "high", "critical"]
+    },
     "note": { "type": "string" },
+    "detail": { "type": "string", "description": "Long-form findings, preserved verbatim." },
     "evidence": {
       "type": "array",
       "items": {

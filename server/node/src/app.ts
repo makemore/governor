@@ -7,12 +7,20 @@ import { Hono } from 'hono';
 import { makeAuth, requireAdmin } from './auth.js';
 import { mintTokenString, newUuid, nowIso, sha256Hex } from './crypto.js';
 import {
+  buildSubjectView,
   loadRecentActivity,
   loadRecentSubjects,
   publicConfigFrom,
 } from './public.js';
 import { renderPublicPage } from './public-render.js';
-import { gateRun, loadRun, serialiseAttestation, serialiseRun } from './runs.js';
+import {
+  parseHistory,
+  renderLogMarkdown,
+  renderReportPage,
+  renderSubjectMarkdown,
+  reportFileName,
+} from './report-render.js';
+import { gateRun, loadRun, parseAttestationBody, serialiseAttestation, serialiseRun } from './runs.js';
 import type { Db } from './storage.js';
 import type { ActorKind, AppVars, Config } from './types.js';
 
@@ -61,6 +69,58 @@ export function createApp(db: Db, cfg: Config): Hono<App> {
         `Authenticated API under <code>/v1</code>.</p>` +
         `<p>Source &amp; spec at <a href="https://github.com/makemore/governor">github.com/makemore/governor</a>.</p>`,
     );
+  });
+
+  // Downloadable reports (same data + opt-in flag as the public page).
+  const REPORT_SUBJECT_LIMIT = 1000;
+  const mdResponse = (body: string, filename: string) =>
+    new Response(body, {
+      headers: {
+        'content-type': 'text/markdown; charset=utf-8',
+        'content-disposition': `attachment; filename="${filename}"`,
+      },
+    });
+
+  app.get('/r/:run_id/report.md', (c) => {
+    if (!cfg.publicEnabled) return c.json({ error: 'not-found' }, 404);
+    const s = buildSubjectView(db, c.req.param('run_id'));
+    if (!s) return c.json({ error: 'not-found', message: 'run does not exist' }, 404);
+    const history = parseHistory(c.req.query('history'));
+    return mdResponse(
+      renderSubjectMarkdown(publicConfigFrom(cfg), s, Date.now(), { history }),
+      reportFileName(s, 'md', history),
+    );
+  });
+
+  app.get('/r/:run_id/report', (c) => {
+    if (!cfg.publicEnabled) return c.json({ error: 'not-found' }, 404);
+    const pc = publicConfigFrom(cfg);
+    const s = buildSubjectView(db, c.req.param('run_id'));
+    if (!s) return c.json({ error: 'not-found', message: 'run does not exist' }, 404);
+    const history = parseHistory(c.req.query('history'));
+    return c.html(renderReportPage(pc, `${s.subjectLabel ?? s.subjectId} — report`, [s], Date.now(), {
+      history,
+      togglePath: `/r/${s.runId}/report`,
+    }));
+  });
+
+  app.get('/report.md', (c) => {
+    if (!cfg.publicEnabled) return c.json({ error: 'not-found' }, 404);
+    const subjects = loadRecentSubjects(db, REPORT_SUBJECT_LIMIT);
+    const history = parseHistory(c.req.query('history'));
+    const filename = history === 'passing' ? 'governor-full-report-passing.md' : 'governor-full-report.md';
+    return mdResponse(renderLogMarkdown(publicConfigFrom(cfg), subjects, Date.now(), { history }), filename);
+  });
+
+  app.get('/report', (c) => {
+    if (!cfg.publicEnabled) return c.json({ error: 'not-found' }, 404);
+    const pc = publicConfigFrom(cfg);
+    const subjects = loadRecentSubjects(db, REPORT_SUBJECT_LIMIT);
+    const history = parseHistory(c.req.query('history'));
+    return c.html(renderReportPage(pc, `${pc.title} — full report`, subjects, Date.now(), {
+      history,
+      togglePath: '/report',
+    }));
   });
 
   const v1 = new Hono<App>();
@@ -155,12 +215,11 @@ export function createApp(db: Db, cfg: Config): Hono<App> {
   v1.post('/runs/:run_id/attestations', async (c) => {
     const actor = c.get('actor');
     const runId = c.req.param('run_id');
-    const body = await c.req.json().catch(() => null) as
-      | { item_key?: string; note?: string }
-      | null;
-    if (!body?.item_key) {
-      return c.json({ error: 'invalid', message: 'item_key is required' }, 422);
+    const parsed = parseAttestationBody(await c.req.json().catch(() => null));
+    if (!parsed.ok) {
+      return c.json({ error: 'invalid', message: parsed.message }, 422);
     }
+    const body = parsed.value;
     const item = db
       .prepare(`SELECT 1 FROM run_items WHERE run_id = ? AND key = ?`)
       .get(runId, body.item_key);
@@ -168,15 +227,21 @@ export function createApp(db: Db, cfg: Config): Hono<App> {
 
     const id = newUuid();
     const attested_at = nowIso();
+    const evidenceJson = body.evidence ? JSON.stringify(body.evidence) : null;
     db.prepare(
-      `INSERT INTO attestations (id, run_id, item_key, actor_id, note, attested_at)
-       VALUES (?,?,?,?,?,?)`,
-    ).run(id, runId, body.item_key, actor.id, body.note ?? null, attested_at);
+      `INSERT INTO attestations
+         (id, run_id, item_key, actor_id, note, outcome, severity, detail, evidence, attested_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      id, runId, body.item_key, actor.id,
+      body.note, body.outcome, body.severity, body.detail, evidenceJson, attested_at,
+    );
     return c.json(
       serialiseAttestation({
         id, run_id: runId, item_key: body.item_key,
         actor_id: actor.id, actor_kind: actor.kind, actor_display_name: actor.display_name,
-        note: body.note ?? null, attested_at,
+        note: body.note, outcome: body.outcome, severity: body.severity,
+        detail: body.detail, evidence: evidenceJson, attested_at,
       }),
       201,
     );

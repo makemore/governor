@@ -1,6 +1,13 @@
 /**
  * Bearer-token authentication. Mirrors server/worker/src/auth.ts; only
  * the storage calls differ (better-sqlite3 instead of D1).
+ *
+ * The bearer is read from X-Governor-Authorization first, falling back to
+ * Authorization. The fallback exists for deployments behind a proxy that
+ * consumes Authorization for its own auth (e.g. Google IAP, which strips it
+ * before the request reaches us); such clients send the Governor bearer in
+ * X-Governor-Authorization instead. Direct deployments keep using
+ * Authorization unchanged.
  */
 import type { Context, MiddlewareHandler } from 'hono';
 import { sha256Hex } from './crypto.js';
@@ -11,7 +18,8 @@ const BOOTSTRAP_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
 
 export function makeAuth(db: Db, cfg: Config): MiddlewareHandler<{ Variables: AppVars }> {
   return async (c, next) => {
-    const header = c.req.header('Authorization') ?? '';
+    const header =
+      c.req.header('X-Governor-Authorization') ?? c.req.header('Authorization') ?? '';
     const match = /^Bearer\s+(.+)$/i.exec(header);
     if (!match) {
       return c.json({ error: 'unauthorized', message: 'missing bearer token' }, 401);

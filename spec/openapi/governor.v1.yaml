@@ -262,21 +262,43 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Attestation' }
 
+    Evidence:
+      type: object
+      required: [kind]
+      description: >
+        One structured piece of proof for an attestation. `kind` selects which
+        of the remaining fields are meaningful: `url` references an external
+        artefact, `hash` pins content by digest, `inline` carries small metadata
+        directly. Servers MUST reject a `url` item without `url` and a `hash`
+        item without `content_hash`.
+      properties:
+        kind:            { type: string, enum: [url, hash, inline] }
+        url:             { type: string, format: uri }
+        content_hash:    { type: string, description: "Digest, e.g. sha256:…" }
+        media_type:      { type: string }
+        inline_metadata: { type: object, additionalProperties: true }
+
     AttestationCreate:
       type: object
       required: [item_key]
       properties:
         item_key: { type: string, minLength: 1 }
-        note:     { type: string }
+        outcome:
+          type: string
+          enum: [pass, fail, waived]
+          default: pass
+          description: >
+            What this sweep found. `pass` and `waived` satisfy the rule; `fail`
+            is recorded but never satisfies the gate. Defaults to `pass`.
+        severity:
+          type: string
+          enum: [info, low, medium, high, critical]
+          description: "Optional severity, most useful alongside a 'fail'."
+        note:     { type: string, description: "Short human summary." }
+        detail:   { type: string, description: "Long-form findings, preserved verbatim." }
         evidence:
           type: array
-          items:
-            type: object
-            properties:
-              kind:         { type: string, enum: [url, hash, inline] }
-              url:          { type: string, format: uri }
-              content_hash: { type: string }
-              media_type:   { type: string }
+          items: { $ref: '#/components/schemas/Evidence' }
 
     Attestation:
       type: object
@@ -293,7 +315,16 @@ components:
             kind:         { type: string, enum: [human, agent, service] }
             display_name: { type: string }
         attested_at: { type: string, format: date-time }
+        outcome:
+          type: string
+          enum: [pass, fail, waived]
+          description: "Defaults to 'pass' for rows created before this field existed."
+        severity:    { type: string, enum: [info, low, medium, high, critical] }
         note:        { type: string }
+        detail:      { type: string }
+        evidence:
+          type: array
+          items: { $ref: '#/components/schemas/Evidence' }
 
     GateDecision:
       type: object

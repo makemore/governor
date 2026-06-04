@@ -7,13 +7,21 @@ import { Hono } from 'hono';
 import { auth, requireAdmin } from './auth.js';
 import { mintTokenString, newUuid, nowIso, sha256Hex } from './crypto.js';
 import {
+  buildSubjectView,
   isPublicEnabled,
   loadRecentActivity,
   loadRecentSubjects,
   readPublicConfig,
 } from './public.js';
 import { renderPublicPage } from './public-render.js';
-import { gateRun, loadRun, serialiseAttestation, serialiseRun } from './runs.js';
+import {
+  parseHistory,
+  renderLogMarkdown,
+  renderReportPage,
+  renderSubjectMarkdown,
+  reportFileName,
+} from './report-render.js';
+import { gateRun, loadRun, parseAttestationBody, serialiseAttestation, serialiseRun } from './runs.js';
 import type { ActorKind, AuthedActor, Env } from './types.js';
 
 type App = { Bindings: Env; Variables: { actor: AuthedActor } };
@@ -79,6 +87,58 @@ app.get('/', async (c) => {
       `Authenticated API under <code>/v1</code>.</p>` +
       `<p>Source &amp; spec at <a href="https://github.com/makemore/governor">github.com/makemore/governor</a>.</p>`,
   );
+});
+
+// Downloadable reports (same data + opt-in flag as the public page).
+const REPORT_SUBJECT_LIMIT = 1000;
+const mdResponse = (body: string, filename: string) =>
+  new Response(body, {
+    headers: {
+      'content-type': 'text/markdown; charset=utf-8',
+      'content-disposition': `attachment; filename="${filename}"`,
+    },
+  });
+
+app.get('/r/:run_id/report.md', async (c) => {
+  if (!isPublicEnabled(c.env)) return c.json({ error: 'not-found' }, 404);
+  const s = await buildSubjectView(c.env, c.req.param('run_id'));
+  if (!s) return c.json({ error: 'not-found', message: 'run does not exist' }, 404);
+  const history = parseHistory(c.req.query('history'));
+  return mdResponse(
+    renderSubjectMarkdown(readPublicConfig(c.env), s, Date.now(), { history }),
+    reportFileName(s, 'md', history),
+  );
+});
+
+app.get('/r/:run_id/report', async (c) => {
+  if (!isPublicEnabled(c.env)) return c.json({ error: 'not-found' }, 404);
+  const cfg = readPublicConfig(c.env);
+  const s = await buildSubjectView(c.env, c.req.param('run_id'));
+  if (!s) return c.json({ error: 'not-found', message: 'run does not exist' }, 404);
+  const history = parseHistory(c.req.query('history'));
+  return c.html(renderReportPage(cfg, `${s.subjectLabel ?? s.subjectId} — report`, [s], Date.now(), {
+    history,
+    togglePath: `/r/${s.runId}/report`,
+  }));
+});
+
+app.get('/report.md', async (c) => {
+  if (!isPublicEnabled(c.env)) return c.json({ error: 'not-found' }, 404);
+  const subjects = await loadRecentSubjects(c.env, REPORT_SUBJECT_LIMIT);
+  const history = parseHistory(c.req.query('history'));
+  const filename = history === 'passing' ? 'governor-full-report-passing.md' : 'governor-full-report.md';
+  return mdResponse(renderLogMarkdown(readPublicConfig(c.env), subjects, Date.now(), { history }), filename);
+});
+
+app.get('/report', async (c) => {
+  if (!isPublicEnabled(c.env)) return c.json({ error: 'not-found' }, 404);
+  const cfg = readPublicConfig(c.env);
+  const subjects = await loadRecentSubjects(c.env, REPORT_SUBJECT_LIMIT);
+  const history = parseHistory(c.req.query('history'));
+  return c.html(renderReportPage(cfg, `${cfg.title} — full report`, subjects, Date.now(), {
+    history,
+    togglePath: '/report',
+  }));
 });
 
 const v1 = new Hono<App>();
@@ -173,12 +233,11 @@ v1.get('/runs/:run_id', async (c) => {
 v1.post('/runs/:run_id/attestations', async (c) => {
   const actor = c.get('actor');
   const runId = c.req.param('run_id');
-  const body = await c.req.json().catch(() => null) as
-    | { item_key?: string; note?: string }
-    | null;
-  if (!body?.item_key) {
-    return c.json({ error: 'invalid', message: 'item_key is required' }, 422);
+  const parsed = parseAttestationBody(await c.req.json().catch(() => null));
+  if (!parsed.ok) {
+    return c.json({ error: 'invalid', message: parsed.message }, 422);
   }
+  const body = parsed.value;
   const item = await c.env.DB
     .prepare(`SELECT 1 FROM run_items WHERE run_id = ? AND key = ?`)
     .bind(runId, body.item_key)
@@ -187,18 +246,24 @@ v1.post('/runs/:run_id/attestations', async (c) => {
 
   const id = newUuid();
   const attested_at = nowIso();
+  const evidenceJson = body.evidence ? JSON.stringify(body.evidence) : null;
   await c.env.DB
     .prepare(
-      `INSERT INTO attestations (id, run_id, item_key, actor_id, note, attested_at)
-       VALUES (?,?,?,?,?,?)`,
+      `INSERT INTO attestations
+         (id, run_id, item_key, actor_id, note, outcome, severity, detail, evidence, attested_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
     )
-    .bind(id, runId, body.item_key, actor.id, body.note ?? null, attested_at)
+    .bind(
+      id, runId, body.item_key, actor.id,
+      body.note, body.outcome, body.severity, body.detail, evidenceJson, attested_at,
+    )
     .run();
   return c.json(
     serialiseAttestation({
       id, run_id: runId, item_key: body.item_key,
       actor_id: actor.id, actor_kind: actor.kind, actor_display_name: actor.display_name,
-      note: body.note ?? null, attested_at,
+      note: body.note, outcome: body.outcome, severity: body.severity,
+      detail: body.detail, evidence: evidenceJson, attested_at,
     }),
     201,
   );

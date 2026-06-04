@@ -9,6 +9,13 @@
  *
  * 2. A token issued via POST /v1/actors/{id}/tokens. Looked up by SHA-256
  *    hash; roles loaded from actor_roles.
+ *
+ * The bearer is read from X-Governor-Authorization first, falling back to
+ * Authorization. The fallback exists for deployments behind a proxy that
+ * consumes Authorization for its own auth (e.g. Google IAP, which strips it
+ * before the request reaches us); such clients send the Governor bearer in
+ * X-Governor-Authorization instead. Direct deployments keep using
+ * Authorization unchanged.
  */
 import type { Context, MiddlewareHandler } from 'hono';
 import { sha256Hex } from './crypto.js';
@@ -18,14 +25,19 @@ const BOOTSTRAP_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
 
 export const auth: MiddlewareHandler<{ Bindings: Env; Variables: { actor: AuthedActor } }> =
   async (c, next) => {
-    const header = c.req.header('Authorization') ?? '';
+    const header =
+      c.req.header('X-Governor-Authorization') ?? c.req.header('Authorization') ?? '';
     const match = /^Bearer\s+(.+)$/i.exec(header);
     if (!match) {
       return c.json({ error: 'unauthorized', message: 'missing bearer token' }, 401);
     }
     const token = match[1]!.trim();
 
-    if (c.env.GOVERNOR_BOOTSTRAP_TOKEN && token === c.env.GOVERNOR_BOOTSTRAP_TOKEN) {
+    // Trimmed: a bootstrap secret may carry surrounding whitespace (e.g. a
+    // trailing newline from `openssl ... | secrets add --data-file=-`), which
+    // would never match the already-trimmed incoming bearer token.
+    const bootstrapToken = c.env.GOVERNOR_BOOTSTRAP_TOKEN?.trim();
+    if (bootstrapToken && token === bootstrapToken) {
       c.set('actor', {
         id: BOOTSTRAP_ACTOR_ID,
         kind: 'service',

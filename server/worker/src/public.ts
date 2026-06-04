@@ -6,7 +6,7 @@
  * what (if anything) to expose by setting environment variables in
  * wrangler.toml.
  */
-import { gateRun, loadRun } from './runs.js';
+import { gateRun, loadRun, type EvidenceItem } from './runs.js';
 import type { Env } from './types.js';
 
 export interface PublicConfig {
@@ -48,10 +48,23 @@ export interface ActivityRow {
   actor_kind: string;
   actor_display_name: string;
   note: string | null;
+  outcome: string | null;
   attested_at: string;
   subject_id: string;
   subject_label: string | null;
   checklist_title: string | null;
+}
+
+export interface AttestationView {
+  id: string;
+  actorKind: string;
+  displayName: string;
+  attestedAt: string;
+  outcome: string;
+  severity: string | null;
+  note: string | null;
+  detail: string | null;
+  evidence: EvidenceItem[] | null;
 }
 
 export interface SubjectView {
@@ -67,8 +80,47 @@ export interface SubjectView {
     key: string;
     description: string | null;
     satisfied: boolean;
-    attestations: { actorKind: string; displayName: string; attestedAt: string }[];
+    attestations: AttestationView[];
   }[];
+}
+
+export async function buildSubjectView(env: Env, runId: string): Promise<SubjectView | null> {
+  const bundle = await loadRun(env, runId);
+  if (!bundle) return null;
+  const gate = await gateRun(env, bundle);
+  const attsByItem = new Map<string, typeof bundle.attestations>();
+  for (const a of bundle.attestations) {
+    const list = attsByItem.get(a.item_key) ?? [];
+    list.push(a);
+    attsByItem.set(a.item_key, list);
+  }
+  const satisfiedKeys = new Set(gate.items.filter((i) => i.satisfied).map((i) => i.key));
+  return {
+    runId: bundle.run.id,
+    subjectId: bundle.run.subject_id,
+    subjectLabel: bundle.run.subject_label,
+    checklistTitle: bundle.run.checklist_title,
+    createdAt: bundle.run.created_at,
+    decision: gate.decision,
+    totalItems: gate.summary.items_total,
+    satisfiedItems: gate.summary.items_satisfied,
+    items: bundle.items.map((i) => ({
+      key: i.key,
+      description: i.description,
+      satisfied: satisfiedKeys.has(i.key),
+      attestations: (attsByItem.get(i.key) ?? []).map((a) => ({
+        id: a.id,
+        actorKind: a.actor_kind,
+        displayName: a.actor_display_name,
+        attestedAt: a.attested_at,
+        outcome: a.outcome ?? 'pass',
+        severity: a.severity,
+        note: a.note,
+        detail: a.detail,
+        evidence: a.evidence ? (JSON.parse(a.evidence) as EvidenceItem[]) : null,
+      })),
+    })),
+  };
 }
 
 export async function loadRecentSubjects(env: Env, limit: number): Promise<SubjectView[]> {
@@ -78,36 +130,8 @@ export async function loadRecentSubjects(env: Env, limit: number): Promise<Subje
     .all<{ id: string }>();
   const out: SubjectView[] = [];
   for (const r of rows.results ?? []) {
-    const bundle = await loadRun(env, r.id);
-    if (!bundle) continue;
-    const gate = await gateRun(env, bundle);
-    const attsByItem = new Map<string, typeof bundle.attestations>();
-    for (const a of bundle.attestations) {
-      const list = attsByItem.get(a.item_key) ?? [];
-      list.push(a);
-      attsByItem.set(a.item_key, list);
-    }
-    const satisfiedKeys = new Set(gate.items.filter((i) => i.satisfied).map((i) => i.key));
-    out.push({
-      runId: bundle.run.id,
-      subjectId: bundle.run.subject_id,
-      subjectLabel: bundle.run.subject_label,
-      checklistTitle: bundle.run.checklist_title,
-      createdAt: bundle.run.created_at,
-      decision: gate.decision,
-      totalItems: gate.summary.items_total,
-      satisfiedItems: gate.summary.items_satisfied,
-      items: bundle.items.map((i) => ({
-        key: i.key,
-        description: i.description,
-        satisfied: satisfiedKeys.has(i.key),
-        attestations: (attsByItem.get(i.key) ?? []).map((a) => ({
-          actorKind: a.actor_kind,
-          displayName: a.actor_display_name,
-          attestedAt: a.attested_at,
-        })),
-      })),
-    });
+    const view = await buildSubjectView(env, r.id);
+    if (view) out.push(view);
   }
   return out;
 }
@@ -117,7 +141,7 @@ export async function loadRecentActivity(env: Env, limit: number): Promise<Activ
     .prepare(
       `SELECT a.id AS attestation_id, a.run_id, a.item_key,
               ac.kind AS actor_kind, ac.display_name AS actor_display_name,
-              a.note, a.attested_at,
+              a.note, a.outcome, a.attested_at,
               r.subject_id, r.subject_label, r.checklist_title
        FROM attestations a
        JOIN actors ac ON ac.id = a.actor_id

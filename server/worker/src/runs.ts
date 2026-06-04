@@ -30,7 +30,115 @@ interface AttRow {
   actor_kind: string;
   actor_display_name: string;
   note: string | null;
+  outcome: string | null;
+  severity: string | null;
+  detail: string | null;
+  evidence: string | null;
   attested_at: string;
+}
+
+export const ATTESTATION_OUTCOMES = ['pass', 'fail', 'waived'] as const;
+export type AttestationOutcome = (typeof ATTESTATION_OUTCOMES)[number];
+
+export const ATTESTATION_SEVERITIES = ['info', 'low', 'medium', 'high', 'critical'] as const;
+
+export type EvidenceKind = 'url' | 'hash' | 'inline';
+export interface EvidenceItem {
+  kind: EvidenceKind;
+  url?: string;
+  content_hash?: string;
+  media_type?: string;
+  inline_metadata?: Record<string, unknown>;
+}
+
+export interface ParsedAttestation {
+  item_key: string;
+  note: string | null;
+  outcome: AttestationOutcome;
+  severity: string | null;
+  detail: string | null;
+  evidence: EvidenceItem[] | null;
+}
+
+export type ParseResult =
+  | { ok: true; value: ParsedAttestation }
+  | { ok: false; message: string };
+
+/**
+ * Validate and normalise an attestation request body. Lenient about
+ * absent fields (everything but item_key is optional; a missing outcome
+ * defaults to 'pass'), strict about malformed enums and evidence shapes —
+ * those return a message the handler turns into a 422.
+ */
+export function parseAttestationBody(raw: unknown): ParseResult {
+  if (!raw || typeof raw !== 'object') {
+    return { ok: false, message: 'request body must be a JSON object' };
+  }
+  const b = raw as Record<string, unknown>;
+  const item_key = typeof b.item_key === 'string' ? b.item_key.trim() : '';
+  if (!item_key) return { ok: false, message: 'item_key is required' };
+
+  let outcome: AttestationOutcome = 'pass';
+  if (b.outcome != null && b.outcome !== '') {
+    if (typeof b.outcome !== 'string' || !(ATTESTATION_OUTCOMES as readonly string[]).includes(b.outcome)) {
+      return { ok: false, message: `outcome must be one of: ${ATTESTATION_OUTCOMES.join(', ')}` };
+    }
+    outcome = b.outcome as AttestationOutcome;
+  }
+
+  let severity: string | null = null;
+  if (b.severity != null && b.severity !== '') {
+    if (typeof b.severity !== 'string' || !(ATTESTATION_SEVERITIES as readonly string[]).includes(b.severity)) {
+      return { ok: false, message: `severity must be one of: ${ATTESTATION_SEVERITIES.join(', ')}` };
+    }
+    severity = b.severity;
+  }
+
+  const note = typeof b.note === 'string' && b.note !== '' ? b.note : null;
+  const detail = typeof b.detail === 'string' && b.detail !== '' ? b.detail : null;
+
+  let evidence: EvidenceItem[] | null = null;
+  if (b.evidence != null) {
+    if (!Array.isArray(b.evidence)) {
+      return { ok: false, message: 'evidence must be an array' };
+    }
+    const items: EvidenceItem[] = [];
+    for (let i = 0; i < b.evidence.length; i++) {
+      const r = parseEvidenceItem(b.evidence[i], i);
+      if (!r.ok) return r;
+      items.push(r.value);
+    }
+    evidence = items.length > 0 ? items : null;
+  }
+
+  return { ok: true, value: { item_key, note, outcome, severity, detail, evidence } };
+}
+
+function parseEvidenceItem(
+  e: unknown,
+  idx: number,
+): { ok: true; value: EvidenceItem } | { ok: false; message: string } {
+  if (!e || typeof e !== 'object') {
+    return { ok: false, message: `evidence[${idx}] must be an object` };
+  }
+  const o = e as Record<string, unknown>;
+  if (o.kind !== 'url' && o.kind !== 'hash' && o.kind !== 'inline') {
+    return { ok: false, message: `evidence[${idx}].kind must be one of: url, hash, inline` };
+  }
+  const item: EvidenceItem = { kind: o.kind };
+  if (typeof o.url === 'string' && o.url !== '') item.url = o.url;
+  if (typeof o.content_hash === 'string' && o.content_hash !== '') item.content_hash = o.content_hash;
+  if (typeof o.media_type === 'string' && o.media_type !== '') item.media_type = o.media_type;
+  if (o.inline_metadata && typeof o.inline_metadata === 'object' && !Array.isArray(o.inline_metadata)) {
+    item.inline_metadata = o.inline_metadata as Record<string, unknown>;
+  }
+  if (item.kind === 'url' && !item.url) {
+    return { ok: false, message: `evidence[${idx}] of kind url requires a url` };
+  }
+  if (item.kind === 'hash' && !item.content_hash) {
+    return { ok: false, message: `evidence[${idx}] of kind hash requires content_hash` };
+  }
+  return { ok: true, value: item };
 }
 
 export interface RunBundle {
@@ -53,7 +161,8 @@ export async function loadRun(env: Env, runId: string): Promise<RunBundle | null
 
   const atts = await env.DB
     .prepare(
-      `SELECT a.id, a.run_id, a.item_key, a.actor_id, a.note, a.attested_at,
+      `SELECT a.id, a.run_id, a.item_key, a.actor_id,
+              a.note, a.outcome, a.severity, a.detail, a.evidence, a.attested_at,
               ac.kind AS actor_kind, ac.display_name AS actor_display_name
        FROM attestations a
        JOIN actors ac ON ac.id = a.actor_id
@@ -101,7 +210,11 @@ export function serialiseAttestation(a: AttRow) {
       display_name: a.actor_display_name,
     },
     attested_at: a.attested_at,
+    outcome: (a.outcome ?? 'pass') as AttestationOutcome,
+    severity: a.severity ?? undefined,
     note: a.note ?? undefined,
+    detail: a.detail ?? undefined,
+    evidence: a.evidence ? (JSON.parse(a.evidence) as EvidenceItem[]) : undefined,
   };
 }
 
@@ -127,6 +240,9 @@ export async function gateRun(env: Env, bundle: RunBundle) {
 
   const byItem = new Map<string, RuleAttestation[]>();
   for (const a of bundle.attestations) {
+    // A recorded failure never satisfies a rule. NULL/pass/waived all count
+    // toward the gate; only an explicit 'fail' is excluded.
+    if (a.outcome === 'fail') continue;
     const list = byItem.get(a.item_key) ?? [];
     list.push({ actor_id: a.actor_id, actor_kind: a.actor_kind });
     byItem.set(a.item_key, list);

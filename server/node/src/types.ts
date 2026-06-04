@@ -56,7 +56,10 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port: Number(env.PORT ?? '8080'),
     dbPath: env.GOVERNOR_DB_PATH ?? '/data/governor.sqlite',
     version: env.GOVERNOR_VERSION ?? 'dev',
-    bootstrapToken: env.GOVERNOR_BOOTSTRAP_TOKEN,
+    // Trimmed: secrets piped in via `... | gcloud secrets versions add
+    // --data-file=-` keep a trailing newline, which would otherwise never
+    // match the (already-trimmed) incoming bearer token.
+    bootstrapToken: env.GOVERNOR_BOOTSTRAP_TOKEN?.trim() || undefined,
 
     replicationUrl: env.GOVERNOR_REPLICATION_URL || undefined,
     allowSingleHost: env.GOVERNOR_ALLOW_SINGLE_HOST === 'true',
