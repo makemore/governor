@@ -13,9 +13,18 @@ import (
 // Persona holds the connection info for a single Governor deployment.
 // The api_key is written to a 0600 file; the field is intentionally not
 // printed by any of the gov commands.
+//
+// IAPAudience / IAPServiceAccount are optional. When the deployment sits
+// behind Identity-Aware Proxy, the CLI mints a Google OIDC ID token for
+// IAPAudience (the IAP OAuth client ID), optionally by impersonating
+// IAPServiceAccount, and sends it in Authorization (which IAP consumes and
+// strips); the Governor bearer then travels in X-Governor-Authorization so
+// the app still receives it untouched.
 type Persona struct {
-	BaseURL string `toml:"base_url"`
-	APIKey  string `toml:"api_key"`
+	BaseURL           string `toml:"base_url"`
+	APIKey            string `toml:"api_key"`
+	IAPAudience       string `toml:"iap_audience,omitempty"`
+	IAPServiceAccount string `toml:"iap_service_account,omitempty"`
 }
 
 type File struct {
@@ -101,8 +110,9 @@ func (f *File) Names() []string {
 
 // Resolve returns the persona that should be used for an invocation.
 // Priority: explicit name -> $GOVERNOR_PERSONA -> env-only (GOVERNOR_BASE_URL +
-// GOVERNOR_API_KEY) -> the file's default. Returns the resolved name (or
-// "(env)" / "(flag)") so callers can report what they used.
+// GOVERNOR_API_KEY) -> nearest .govrc (project-local identity) -> the file's
+// default. Returns the resolved name (or "(env)" / "(flag)" / a ".govrc"
+// annotation) so callers can report what they used.
 func (f *File) Resolve(explicit string) (Persona, string, error) {
 	if explicit != "" {
 		p, ok := f.Personas[explicit]
@@ -125,6 +135,11 @@ func (f *File) Resolve(explicit string) (Persona, string, error) {
 		}
 		return Persona{BaseURL: url, APIKey: key}, "(env)", nil
 	}
+	if p, name, ok, err := f.resolveProjectRC(); err != nil {
+		return Persona{}, "", err
+	} else if ok {
+		return p, name, nil
+	}
 	if f.Default != "" {
 		p, ok := f.Personas[f.Default]
 		if ok {
@@ -132,4 +147,38 @@ func (f *File) Resolve(explicit string) (Persona, string, error) {
 		}
 	}
 	return Persona{}, "", errors.New("no persona configured: run `gov bootstrap` or `gov personas add`")
+}
+
+// resolveProjectRC discovers the nearest .govrc (walking up from the working
+// directory) and turns it into a Persona. A .govrc may either reference a
+// named persona from the central config or carry an inline identity. The
+// returned bool is false (with no error) when no .govrc is found, so callers
+// fall through to the file default.
+func (f *File) resolveProjectRC() (Persona, string, bool, error) {
+	rc, err := FindProjectRC()
+	if err != nil {
+		return Persona{}, "", false, err
+	}
+	if rc == nil {
+		return Persona{}, "", false, nil
+	}
+	if rc.Persona != "" {
+		p, ok := f.Personas[rc.Persona]
+		if !ok {
+			return Persona{}, "", false, fmt.Errorf(
+				".govrc in %s references persona %q, which is not configured (gov personas list)",
+				rc.Dir(), rc.Persona)
+		}
+		return p, rc.Persona + " (.govrc)", true, nil
+	}
+	if rc.BaseURL == "" || rc.APIKey == "" {
+		return Persona{}, "", false, fmt.Errorf(
+			".govrc in %s must set either persona or both base_url and api_key", rc.Dir())
+	}
+	return Persona{
+		BaseURL:           rc.BaseURL,
+		APIKey:            rc.APIKey,
+		IAPAudience:       rc.IAPAudience,
+		IAPServiceAccount: rc.IAPServiceAccount,
+	}, "(.govrc)", true, nil
 }

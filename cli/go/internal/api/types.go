@@ -59,18 +59,37 @@ type RunItem struct {
 	Attestations []Attestation  `json:"attestations"`
 }
 
+// Evidence is one structured piece of proof attached to an attestation.
+// Kind is one of "url", "hash", or "inline"; the other fields are populated
+// according to the kind.
+type Evidence struct {
+	Kind           string         `json:"kind"`
+	URL            string         `json:"url,omitempty"`
+	ContentHash    string         `json:"content_hash,omitempty"`
+	MediaType      string         `json:"media_type,omitempty"`
+	InlineMetadata map[string]any `json:"inline_metadata,omitempty"`
+}
+
 type AttestationCreate struct {
-	ItemKey string `json:"item_key"`
-	Note    string `json:"note,omitempty"`
+	ItemKey  string     `json:"item_key"`
+	Outcome  string     `json:"outcome,omitempty"`
+	Severity string     `json:"severity,omitempty"`
+	Note     string     `json:"note,omitempty"`
+	Detail   string     `json:"detail,omitempty"`
+	Evidence []Evidence `json:"evidence,omitempty"`
 }
 
 type Attestation struct {
-	ID         string    `json:"id"`
-	RunID      string    `json:"run_id"`
-	ItemKey    string    `json:"item_key"`
-	Actor      ActorRef  `json:"actor"`
-	AttestedAt time.Time `json:"attested_at"`
-	Note       string    `json:"note,omitempty"`
+	ID         string     `json:"id"`
+	RunID      string     `json:"run_id"`
+	ItemKey    string     `json:"item_key"`
+	Actor      ActorRef   `json:"actor"`
+	AttestedAt time.Time  `json:"attested_at"`
+	Outcome    string     `json:"outcome,omitempty"`
+	Severity   string     `json:"severity,omitempty"`
+	Note       string     `json:"note,omitempty"`
+	Detail     string     `json:"detail,omitempty"`
+	Evidence   []Evidence `json:"evidence,omitempty"`
 }
 
 type ActorRef struct {

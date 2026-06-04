@@ -40,7 +40,7 @@ func tokensMint() *cobra.Command {
 					return err
 				}
 				if saveAs != "" {
-					if err := savePersona(saveAs, c.BaseURL, tok.Token, false, false); err != nil {
+					if err := savePersona(saveAs, c.BaseURL, tok.Token, c.IAPAudience, c.IAPServiceAccount, false, false); err != nil {
 						return err
 					}
 					path, _ := config.Path()

@@ -62,6 +62,12 @@ func personasShow() *cobra.Command {
 			fmt.Println(ui.Key.Render("name:    ") + args[0])
 			fmt.Println(ui.Key.Render("base_url:") + " " + p.BaseURL)
 			fmt.Println(ui.Key.Render("api_key: ") + redact(p.APIKey))
+			if p.IAPAudience != "" {
+				fmt.Println(ui.Key.Render("iap_audience: ") + p.IAPAudience)
+			}
+			if p.IAPServiceAccount != "" {
+				fmt.Println(ui.Key.Render("iap_service_account: ") + p.IAPServiceAccount)
+			}
 			if f.Default == args[0] {
 				fmt.Println(ui.OK.Render("(default)"))
 			}
@@ -121,7 +127,7 @@ func personasRemove() *cobra.Command {
 }
 
 func personasAdd() *cobra.Command {
-	var name, baseURL, apiKey string
+	var name, baseURL, apiKey, iapAudience, iapServiceAccount string
 	var setDefault bool
 	c := &cobra.Command{
 		Use:   "add",
@@ -130,12 +136,14 @@ func personasAdd() *cobra.Command {
 			if name == "" || baseURL == "" || apiKey == "" {
 				return errors.New("--name, --base-url and --api-key are required")
 			}
-			return savePersona(name, baseURL, apiKey, setDefault, true)
+			return savePersona(name, baseURL, apiKey, iapAudience, iapServiceAccount, setDefault, true)
 		},
 	}
 	c.Flags().StringVar(&name, "name", "", "persona name (e.g. prod)")
 	c.Flags().StringVar(&baseURL, "base-url", "", "Governor API base URL")
 	c.Flags().StringVar(&apiKey, "api-key", "", "bearer token issued by gov tokens mint")
+	c.Flags().StringVar(&iapAudience, "iap-audience", "", "IAP OAuth client ID, if the deployment is behind Identity-Aware Proxy")
+	c.Flags().StringVar(&iapServiceAccount, "iap-service-account", "", "service account to impersonate when minting the IAP token")
 	c.Flags().BoolVar(&setDefault, "default", false, "make this the default persona")
 	return c
 }

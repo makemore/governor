@@ -16,10 +16,12 @@ import (
 
 func newBootstrapCmd() *cobra.Command {
 	var (
-		baseURL     string
-		bootstrap   string
-		displayName string
-		personaName string
+		baseURL           string
+		bootstrap         string
+		displayName       string
+		personaName       string
+		iapAudience       string
+		iapServiceAccount string
 	)
 	c := &cobra.Command{
 		Use:   "bootstrap",
@@ -51,8 +53,25 @@ func newBootstrapCmd() *cobra.Command {
 				return err
 			}
 
+			if iapAudience == "" {
+				iapAudience = os.Getenv("GOVERNOR_IAP_AUDIENCE")
+			}
+			if iapServiceAccount == "" {
+				iapServiceAccount = os.Getenv("GOVERNOR_IAP_SERVICE_ACCOUNT")
+			}
+
+			baseURL, err := api.NormalizeBaseURL(baseURL)
+			if err != nil {
+				return err
+			}
+
 			ctx := context.Background()
 			boot := api.New(baseURL, bootstrap)
+			proxyTok, err := api.ResolveIAPToken(iapAudience, iapServiceAccount)
+			if err != nil {
+				return err
+			}
+			boot.ProxyToken = proxyTok
 
 			var actor *api.Actor
 			var token *api.TokenMint
@@ -95,7 +114,7 @@ func newBootstrapCmd() *cobra.Command {
 				return err
 			}
 
-			if err := savePersona(personaName, baseURL, token.Token, true, false); err != nil {
+			if err := savePersona(personaName, baseURL, token.Token, iapAudience, iapServiceAccount, true, false); err != nil {
 				return err
 			}
 
@@ -114,6 +133,8 @@ func newBootstrapCmd() *cobra.Command {
 	c.Flags().StringVar(&bootstrap, "bootstrap-token", "", "value of GOVERNOR_BOOTSTRAP_TOKEN (default: $GOVERNOR_BOOTSTRAP_TOKEN)")
 	c.Flags().StringVar(&displayName, "display-name", "", "name for the first admin actor (default: $USER)")
 	c.Flags().StringVar(&personaName, "persona", "admin", "name to save the resulting persona under")
+	c.Flags().StringVar(&iapAudience, "iap-audience", "", "IAP OAuth client ID, if the deployment is behind Identity-Aware Proxy (default: $GOVERNOR_IAP_AUDIENCE)")
+	c.Flags().StringVar(&iapServiceAccount, "iap-service-account", "", "service account to impersonate when minting the IAP token (default: $GOVERNOR_IAP_SERVICE_ACCOUNT)")
 	return c
 }
 

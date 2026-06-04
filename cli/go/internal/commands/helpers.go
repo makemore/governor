@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/makemore/governor/cli/go/internal/api"
 	"github.com/makemore/governor/cli/go/internal/config"
 	"github.com/makemore/governor/cli/go/internal/ui"
 )
@@ -19,8 +20,13 @@ func redact(s string) string {
 }
 
 // savePersona writes (or replaces) a persona in the config file.
+// iapAudience/iapServiceAccount may be empty for non-IAP deployments.
 // If announce is true, a one-line confirmation is printed to stderr.
-func savePersona(name, baseURL, apiKey string, setDefault, announce bool) error {
+func savePersona(name, baseURL, apiKey, iapAudience, iapServiceAccount string, setDefault, announce bool) error {
+	baseURL, err := api.NormalizeBaseURL(baseURL)
+	if err != nil {
+		return err
+	}
 	f, err := config.Load()
 	if err != nil {
 		return err
@@ -28,7 +34,12 @@ func savePersona(name, baseURL, apiKey string, setDefault, announce bool) error 
 	if f.Personas == nil {
 		f.Personas = map[string]config.Persona{}
 	}
-	f.Personas[name] = config.Persona{BaseURL: baseURL, APIKey: apiKey}
+	f.Personas[name] = config.Persona{
+		BaseURL:           baseURL,
+		APIKey:            apiKey,
+		IAPAudience:       iapAudience,
+		IAPServiceAccount: iapServiceAccount,
+	}
 	if setDefault || f.Default == "" {
 		f.Default = name
 	}

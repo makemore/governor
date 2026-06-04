@@ -28,7 +28,19 @@ func clientFor() (*api.Client, string, error) {
 	if persona.APIKey == "" {
 		return nil, "", fmt.Errorf("persona %q has no api_key", name)
 	}
-	return api.New(persona.BaseURL, persona.APIKey), name, nil
+	baseURL, err := api.NormalizeBaseURL(persona.BaseURL)
+	if err != nil {
+		return nil, "", fmt.Errorf("persona %q: %w", name, err)
+	}
+	c := api.New(baseURL, persona.APIKey)
+	c.IAPAudience = persona.IAPAudience
+	c.IAPServiceAccount = persona.IAPServiceAccount
+	tok, err := api.ResolveIAPToken(persona.IAPAudience, persona.IAPServiceAccount)
+	if err != nil {
+		return nil, "", err
+	}
+	c.ProxyToken = tok
+	return c, name, nil
 }
 
 // runWith runs fn with a fresh client and prints the selected persona on
