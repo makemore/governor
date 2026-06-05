@@ -20,7 +20,7 @@ import {
   renderSubjectMarkdown,
   reportFileName,
 } from './report-render.js';
-import { gateRun, loadRun, parseAttestationBody, serialiseAttestation, serialiseRun } from './runs.js';
+import { gateRun, listRuns, loadRun, parseAttestationBody, serialiseAttestation, serialiseRun } from './runs.js';
 import type { Db } from './storage.js';
 import type { ActorKind, AppVars, Config } from './types.js';
 
@@ -31,6 +31,13 @@ const FAVICON_SVG =
   '<circle cx="32" cy="32" r="25" fill="none" stroke="#111" stroke-width="6"/>' +
   '<path d="M19 33 L28.5 43 L46 22" fill="none" stroke="#111" stroke-width="7" ' +
   'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+// Clamp the ?limit query for run listing to a sane range (default 50, max 200).
+function parseListLimit(raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? '', 10);
+  if (!Number.isFinite(n) || n <= 0) return 50;
+  return Math.min(n, 200);
+}
 
 export function createApp(db: Db, cfg: Config): Hono<App> {
   const app = new Hono<App>();
@@ -204,6 +211,11 @@ export function createApp(db: Db, cfg: Config): Hono<App> {
     })();
     const bundle = loadRun(db, id);
     return c.json(serialiseRun(bundle!), 201);
+  });
+
+  v1.get('/runs', (c) => {
+    const limit = parseListLimit(c.req.query('limit'));
+    return c.json({ runs: listRuns(db, limit) });
   });
 
   v1.get('/runs/:run_id', (c) => {

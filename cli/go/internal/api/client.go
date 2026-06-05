@@ -152,6 +152,22 @@ func (c *Client) CreateRun(ctx context.Context, in RunCreate) (*Run, error) {
 	return &r, nil
 }
 
+// ListRuns returns recent runs (most recent first). A limit <= 0 lets the
+// server apply its default.
+func (c *Client) ListRuns(ctx context.Context, limit int) ([]RunSummary, error) {
+	path := "/v1/runs"
+	if limit > 0 {
+		path += fmt.Sprintf("?limit=%d", limit)
+	}
+	var resp struct {
+		Runs []RunSummary `json:"runs"`
+	}
+	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Runs, nil
+}
+
 func (c *Client) GetRun(ctx context.Context, id string) (*Run, error) {
 	var r Run
 	if err := c.do(ctx, http.MethodGet, "/v1/runs/"+id, nil, &r); err != nil {

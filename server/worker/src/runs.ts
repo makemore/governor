@@ -218,6 +218,46 @@ export function serialiseAttestation(a: AttRow) {
   };
 }
 
+export interface RunSummary {
+  id: string;
+  subject: { id: string; label?: string; kind?: string };
+  checklist_title?: string;
+  created_at: string;
+  decision: 'allow' | 'deny';
+  summary: { items_total: number; items_satisfied: number };
+}
+
+/**
+ * Lightweight enumeration of recent runs for pickers and dashboards. Most
+ * recent first. Each entry carries the gate decision and item counts so a
+ * client can show progress without a follow-up request per run.
+ */
+export async function listRuns(env: Env, limit: number): Promise<RunSummary[]> {
+  const rows = await env.DB
+    .prepare(`SELECT id FROM runs ORDER BY created_at DESC LIMIT ?`)
+    .bind(limit)
+    .all<{ id: string }>();
+  const out: RunSummary[] = [];
+  for (const r of rows.results ?? []) {
+    const bundle = await loadRun(env, r.id);
+    if (!bundle) continue;
+    const gate = await gateRun(env, bundle);
+    out.push({
+      id: bundle.run.id,
+      subject: {
+        id: bundle.run.subject_id,
+        label: bundle.run.subject_label ?? undefined,
+        kind: bundle.run.subject_kind ?? undefined,
+      },
+      checklist_title: bundle.run.checklist_title ?? undefined,
+      created_at: bundle.run.created_at,
+      decision: gate.decision,
+      summary: gate.summary,
+    });
+  }
+  return out;
+}
+
 /**
  * Compute the gate decision. Loads per-actor roles for everyone who has
  * attested on this run, then asks the pure evaluator about each item.

@@ -44,8 +44,10 @@ export function renderPublicPage(
       ? `<h3 style="margin-top:36px">Recent activity</h3><ul class="timeline">${activity.map((a) => renderActivity(cfg, a, nowMs)).join('')}</ul>`
       : '',
     subjects.length > 0
-      ? `<div class="dl" style="margin-top:28px">Download full report: ` +
-        `<a href="/report">PDF</a> · <a href="/report.md">Markdown</a></div>`
+      ? `<div class="dl" style="margin-top:28px">Full report: ` +
+        `<a href="/report">PDF</a> · <a href="/report.md">Markdown</a>` +
+        ` &nbsp;|&nbsp; Pass report: ` +
+        `<a href="/report?history=passing">PDF</a> · <a href="/report.md?history=passing">Markdown</a></div>`
       : '',
     renderFooter(cfg),
     '</main></body></html>',
@@ -134,9 +136,12 @@ function renderBanner(b: { cls: string; heading: string; sub: string }): string 
 
 function renderSubject(cfg: PublicConfig, s: SubjectView, nowMs: number): string {
   const label = s.subjectLabel ?? s.subjectId;
-  const dl = `<div class="dl">Report: ` +
+  const dl = `<div class="dl">Full report: ` +
     `<a href="/r/${escape(s.runId)}/report">PDF</a> · ` +
-    `<a href="/r/${escape(s.runId)}/report.md">Markdown</a></div>`;
+    `<a href="/r/${escape(s.runId)}/report.md">Markdown</a>` +
+    ` &nbsp;|&nbsp; Pass report: ` +
+    `<a href="/r/${escape(s.runId)}/report?history=passing">PDF</a> · ` +
+    `<a href="/r/${escape(s.runId)}/report.md?history=passing">Markdown</a></div>`;
   return `<div class="card"><div class="head">` +
     `<div class="id">${escape(label)} <span class="pill ${s.decision}">${s.decision}</span></div>` +
     `<div class="when">${escape(relativeTime(s.createdAt, nowMs))}</div></div>` +

@@ -99,6 +99,7 @@ otherwise the default persona is used.
 | `gov runs new <file.json>` | Open a run from a checklist file (`-` for stdin). |
 | `gov runs show <run-id>` | Print a run and its attestations as JSON. |
 | `gov attest <run-id> <item-key> [flags]` | Append-only signature on one item (see below). |
+| `gov human attest [run-id]` | Interactive walkthrough of the items waiting on a human (for people, not you). Omit the id to pick from recent runs; switches to a human persona if the active one isn't. |
 | `gov gate <run-id> [-q]` | Evaluate the gate; exit 0 = allow, 1 = deny. |
 | `gov report [run-id] [flags]` | Download an md/html/pdf report (see below). |
 | `gov llms` | Print this document. |
@@ -175,7 +176,11 @@ gov report <run-id> --history passing      # clean PDF of what was signed off
 1. Never record an attestation you cannot truthfully make. Sign only for
    work you actually did or checks you actually ran.
 2. You attest as kind `agent`. Items requiring `actor_with_kind: human` are
-   not yours to satisfy — route those to a person.
+   not yours to satisfy — route those to a person. Hand them
+   `gov human attest` (no id needed — they pick the run from a list): it
+   signs as a human persona (offering one if their active persona is an agent)
+   and walks them through exactly the items waiting on a human, so your handoff
+   is one command instead of a list of hand-written `gov attest` calls.
 3. The checklist is pinned before work. Do not edit a run's rules to force a
    gate to pass; that defeats the entire point of the tool.
 4. Treat `deny` as a hard stop. Report which items are unsatisfied (from the

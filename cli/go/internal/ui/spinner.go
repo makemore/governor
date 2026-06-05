@@ -21,6 +21,12 @@ func WithSpinner(title string, fn func() error) error {
 	return outerErr
 }
 
+// IsTTY reports whether stdout is an interactive terminal, so callers can
+// decide whether interactive prompts (e.g. huh forms) are usable.
+func IsTTY() bool {
+	return isTTY()
+}
+
 func isTTY() bool {
 	fi, err := os.Stdout.Stat()
 	if err != nil {

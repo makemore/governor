@@ -22,25 +22,50 @@ func clientFor() (*api.Client, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
+	c, err := buildClient(persona, name)
+	if err != nil {
+		return nil, "", err
+	}
+	return c, name, nil
+}
+
+// clientForPersona builds a client for a specific named persona, regardless of
+// the active default or -p flag. Used by interactive commands (e.g.
+// `gov human attest`) that need to switch persona mid-run.
+func clientForPersona(name string) (*api.Client, error) {
+	f, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
+	persona, ok := f.Personas[name]
+	if !ok {
+		return nil, fmt.Errorf("no such persona: %s", name)
+	}
+	return buildClient(persona, name)
+}
+
+// buildClient turns a resolved persona into an api.Client, including any IAP
+// OIDC token the deployment requires.
+func buildClient(persona config.Persona, name string) (*api.Client, error) {
 	if persona.BaseURL == "" {
-		return nil, "", fmt.Errorf("persona %q has no base_url", name)
+		return nil, fmt.Errorf("persona %q has no base_url", name)
 	}
 	if persona.APIKey == "" {
-		return nil, "", fmt.Errorf("persona %q has no api_key", name)
+		return nil, fmt.Errorf("persona %q has no api_key", name)
 	}
 	baseURL, err := api.NormalizeBaseURL(persona.BaseURL)
 	if err != nil {
-		return nil, "", fmt.Errorf("persona %q: %w", name, err)
+		return nil, fmt.Errorf("persona %q: %w", name, err)
 	}
 	c := api.New(baseURL, persona.APIKey)
 	c.IAPAudience = persona.IAPAudience
 	c.IAPServiceAccount = persona.IAPServiceAccount
 	tok, err := api.ResolveIAPToken(persona.IAPAudience, persona.IAPServiceAccount)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	c.ProxyToken = tok
-	return c, name, nil
+	return c, nil
 }
 
 // runWith runs fn with a fresh client and prints the selected persona on

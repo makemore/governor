@@ -76,6 +76,7 @@ the word `allow` / `deny`.
 | `gov runs new <file.json>` | Open a run from a checklist JSON file (`-` for stdin). `--subject`, `--subject-kind`, `--subject-label` fill in fields the file omits. |
 | `gov runs show <run-id>` | Print a run + its attestations as JSON. |
 | `gov attest <run-id> <item-key> [--note]` | Append-only signature on a single item, by the current persona's actor. |
+| `gov human attest [run-id]` | Interactive sign-off for people: omit the id to pick from recent runs, signs as a human persona (offering one if the active persona is an agent/service), lists the items still waiting on a human, and prompts for outcome/note/evidence per item — no hand-written `attest` commands. `--all` includes every unsatisfied item. |
 | `gov gate <run-id> [--quiet]` | Evaluate the gate. Exit 0 on allow, exit 1 on deny. |
 
 ## Exit codes

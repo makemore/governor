@@ -21,12 +21,19 @@ import {
   renderSubjectMarkdown,
   reportFileName,
 } from './report-render.js';
-import { gateRun, loadRun, parseAttestationBody, serialiseAttestation, serialiseRun } from './runs.js';
+import { gateRun, listRuns, loadRun, parseAttestationBody, serialiseAttestation, serialiseRun } from './runs.js';
 import type { ActorKind, AuthedActor, Env } from './types.js';
 
 type App = { Bindings: Env; Variables: { actor: AuthedActor } };
 
 const app = new Hono<App>();
+
+// Clamp the ?limit query for run listing to a sane range (default 50, max 200).
+function parseListLimit(raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? '', 10);
+  if (!Number.isFinite(n) || n <= 0) return 50;
+  return Math.min(n, 200);
+}
 
 const FAVICON_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
@@ -222,6 +229,11 @@ v1.post('/runs', async (c) => {
   await c.env.DB.batch(stmts);
   const bundle = await loadRun(c.env, id);
   return c.json(serialiseRun(bundle!), 201);
+});
+
+v1.get('/runs', async (c) => {
+  const limit = parseListLimit(c.req.query('limit'));
+  return c.json({ runs: await listRuns(c.env, limit) });
 });
 
 v1.get('/runs/:run_id', async (c) => {

@@ -52,6 +52,18 @@ type Run struct {
 	Items     []RunItem  `json:"items"`
 }
 
+// RunSummary is a lightweight run entry returned by GET /v1/runs, carrying
+// the gate decision and item counts so a picker can show progress without a
+// follow-up request per run.
+type RunSummary struct {
+	ID             string      `json:"id"`
+	Subject        RunSubject  `json:"subject"`
+	ChecklistTitle string      `json:"checklist_title,omitempty"`
+	CreatedAt      time.Time   `json:"created_at"`
+	Decision       string      `json:"decision"`
+	Summary        GateSummary `json:"summary"`
+}
+
 type RunItem struct {
 	Key          string         `json:"key"`
 	Description  string         `json:"description,omitempty"`
