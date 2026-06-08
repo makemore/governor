@@ -74,6 +74,7 @@ the word `allow` / `deny`.
 | `gov actors create --kind --name --roles` | Admin-only. Creates a human/agent/service actor. Returns the new UUID. |
 | `gov tokens mint <actor-id> [--save-as <name>]` | Admin-only. Mints a bearer token. Printed once unless `--save-as` stashes it directly into a persona. |
 | `gov runs new <file.json>` | Open a run from a checklist JSON file (`-` for stdin). `--subject`, `--subject-kind`, `--subject-label` fill in fields the file omits. |
+| `gov runs list [flags]` | List/search runs (most recent first) with gate decision and item progress. `--search/-q` matches subject id/label and checklist title; `--limit`/`--offset` page; `--json` prints the raw response. |
 | `gov runs show <run-id>` | Print a run + its attestations as JSON. |
 | `gov attest <run-id> <item-key> [--note]` | Append-only signature on a single item, by the current persona's actor. |
 | `gov human attest [run-id]` | Interactive sign-off for people: omit the id to pick from recent runs, signs as a human persona (offering one if the active persona is an agent/service), lists the items still waiting on a human, and prompts for outcome/note/evidence per item — no hand-written `attest` commands. `--all` includes every unsatisfied item. |

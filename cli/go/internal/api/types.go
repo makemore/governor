@@ -64,6 +64,23 @@ type RunSummary struct {
 	Summary        GateSummary `json:"summary"`
 }
 
+// RunListOptions controls a GET /v1/runs request: page size, page offset, and
+// a substring search over subject id/label and checklist title.
+type RunListOptions struct {
+	Limit  int
+	Offset int
+	Search string
+}
+
+// RunListPage is the paginated response from GET /v1/runs. Total is the count
+// of matching runs ignoring Limit/Offset.
+type RunListPage struct {
+	Runs   []RunSummary `json:"runs"`
+	Total  int          `json:"total"`
+	Limit  int          `json:"limit"`
+	Offset int          `json:"offset"`
+}
+
 type RunItem struct {
 	Key          string         `json:"key"`
 	Description  string         `json:"description,omitempty"`
@@ -111,9 +128,9 @@ type ActorRef struct {
 }
 
 type GateDecision struct {
-	Decision string        `json:"decision"`
-	Summary  GateSummary   `json:"summary"`
-	Items    []GateItem    `json:"items"`
+	Decision string      `json:"decision"`
+	Summary  GateSummary `json:"summary"`
+	Items    []GateItem  `json:"items"`
 }
 
 type GateSummary struct {

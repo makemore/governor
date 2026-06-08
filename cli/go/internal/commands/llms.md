@@ -97,6 +97,7 @@ otherwise the default persona is used.
 | `gov actors create --kind --name --roles` | Admin: create a human/agent/service actor. |
 | `gov tokens mint <actor-id> [--save-as <name>]` | Admin: mint a bearer token. |
 | `gov runs new <file.json>` | Open a run from a checklist file (`-` for stdin). |
+| `gov runs list [--search <q>] [--limit N] [--offset N] [--json]` | List/search runs (most recent first) with gate decision and progress; paginated. |
 | `gov runs show <run-id>` | Print a run and its attestations as JSON. |
 | `gov attest <run-id> <item-key> [flags]` | Append-only signature on one item (see below). |
 | `gov human attest [run-id]` | Interactive walkthrough of the items waiting on a human (for people, not you). Omit the id to pick from recent runs; switches to a human persona if the active one isn't. |

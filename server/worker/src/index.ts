@@ -35,6 +35,13 @@ function parseListLimit(raw: string | undefined): number {
   return Math.min(n, 200);
 }
 
+// Parse the ?offset query for run listing; non-positive/invalid -> 0.
+function parseListOffset(raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? '', 10);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return n;
+}
+
 const FAVICON_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
   '<circle cx="32" cy="32" r="25" fill="none" stroke="#111" stroke-width="6"/>' +
@@ -233,7 +240,9 @@ v1.post('/runs', async (c) => {
 
 v1.get('/runs', async (c) => {
   const limit = parseListLimit(c.req.query('limit'));
-  return c.json({ runs: await listRuns(c.env, limit) });
+  const offset = parseListOffset(c.req.query('offset'));
+  const search = c.req.query('q') ?? c.req.query('search') ?? undefined;
+  return c.json(await listRuns(c.env, { limit, offset, search }));
 });
 
 v1.get('/runs/:run_id', async (c) => {

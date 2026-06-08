@@ -17,8 +17,94 @@ func newRunsCmd() *cobra.Command {
 		Use:   "runs",
 		Short: "Create and inspect runs",
 	}
-	c.AddCommand(runsNew(), runsShow())
+	c.AddCommand(runsNew(), runsList(), runsShow())
 	return c
+}
+
+func runsList() *cobra.Command {
+	var (
+		limit  int
+		offset int
+		search string
+		asJSON bool
+	)
+	c := &cobra.Command{
+		Use:   "list",
+		Short: "List and search runs (paginated)",
+		Long: "List runs, most recent first. Filter with --search (matches the\n" +
+			"subject id/label and checklist title) and page with --limit/--offset.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runWith(func(ctx context.Context, c *api.Client) error {
+				var page *api.RunListPage
+				if err := ui.WithSpinner("loading runs", func() error {
+					p, err := c.ListRunsPage(ctx, api.RunListOptions{
+						Limit:  limit,
+						Offset: offset,
+						Search: search,
+					})
+					page = p
+					return err
+				}); err != nil {
+					return err
+				}
+				if asJSON {
+					out, _ := json.MarshalIndent(page, "", "  ")
+					fmt.Println(string(out))
+					return nil
+				}
+				renderRunsTable(page, offset)
+				return nil
+			})
+		},
+	}
+	c.Flags().IntVar(&limit, "limit", 50, "max runs to return (1-200)")
+	c.Flags().IntVar(&offset, "offset", 0, "runs to skip, for pagination")
+	c.Flags().StringVarP(&search, "search", "q", "", "filter by subject id/label or checklist title")
+	c.Flags().BoolVar(&asJSON, "json", false, "print the raw JSON response")
+	return c
+}
+
+// renderRunsTable prints a run list page as an aligned table with a paging
+// footer. The status column is a single gate glyph (✓ allow / ✗ deny).
+func renderRunsTable(page *api.RunListPage, offset int) {
+	if page == nil || len(page.Runs) == 0 {
+		fmt.Println(ui.Sub.Render("no runs match."))
+		return
+	}
+	fmt.Println(ui.Sub.Render(fmt.Sprintf("%-1s  %-7s %-5s %-40s %s",
+		"", "items", "age", "subject", "run id")))
+	for _, r := range page.Runs {
+		glyph := ui.OK.Render(ui.CheckMark)
+		if r.Decision != "allow" {
+			glyph = ui.Bad.Render(ui.Cross)
+		}
+		subj := r.Subject.Label
+		if subj == "" {
+			subj = r.Subject.ID
+		}
+		if subj == "" {
+			subj = r.ChecklistTitle
+		}
+		prog := fmt.Sprintf("%d/%d", r.Summary.ItemsSatisfied, r.Summary.ItemsTotal)
+		fmt.Printf("%s  %-7s %-5s %-40s %s\n",
+			glyph, prog, humanizeAge(r.CreatedAt), truncate(subj, 40), r.ID)
+	}
+	start := offset + 1
+	end := offset + len(page.Runs)
+	// Older servers don't report a total; degrade to a plain count rather than
+	// printing a misleading "of 0".
+	var footer string
+	if page.Total >= end {
+		footer = fmt.Sprintf("showing %d–%d of %d", start, end, page.Total)
+		if end < page.Total {
+			footer += fmt.Sprintf("  ·  next page: --offset %d", end)
+		}
+	} else {
+		footer = fmt.Sprintf("showing %d run(s)", len(page.Runs))
+	}
+	fmt.Println()
+	fmt.Println(ui.Sub.Render(footer))
 }
 
 func runsNew() *cobra.Command {

@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -155,17 +156,37 @@ func (c *Client) CreateRun(ctx context.Context, in RunCreate) (*Run, error) {
 // ListRuns returns recent runs (most recent first). A limit <= 0 lets the
 // server apply its default.
 func (c *Client) ListRuns(ctx context.Context, limit int) ([]RunSummary, error) {
-	path := "/v1/runs"
-	if limit > 0 {
-		path += fmt.Sprintf("?limit=%d", limit)
-	}
-	var resp struct {
-		Runs []RunSummary `json:"runs"`
-	}
-	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
+	page, err := c.ListRunsPage(ctx, RunListOptions{Limit: limit})
+	if err != nil {
 		return nil, err
 	}
-	return resp.Runs, nil
+	return page.Runs, nil
+}
+
+// ListRunsPage returns a page of runs (most recent first) plus the total count
+// of matching runs, supporting pagination (Offset) and a substring Search over
+// subject id/label and checklist title. A Limit <= 0 lets the server apply its
+// default.
+func (c *Client) ListRunsPage(ctx context.Context, opts RunListOptions) (*RunListPage, error) {
+	q := url.Values{}
+	if opts.Limit > 0 {
+		q.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if opts.Offset > 0 {
+		q.Set("offset", strconv.Itoa(opts.Offset))
+	}
+	if s := strings.TrimSpace(opts.Search); s != "" {
+		q.Set("q", s)
+	}
+	path := "/v1/runs"
+	if enc := q.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var page RunListPage
+	if err := c.do(ctx, http.MethodGet, path, nil, &page); err != nil {
+		return nil, err
+	}
+	return &page, nil
 }
 
 func (c *Client) GetRun(ctx context.Context, id string) (*Run, error) {

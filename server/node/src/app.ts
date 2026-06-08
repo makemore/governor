@@ -39,6 +39,13 @@ function parseListLimit(raw: string | undefined): number {
   return Math.min(n, 200);
 }
 
+// Parse the ?offset query for run listing; non-positive/invalid -> 0.
+function parseListOffset(raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? '', 10);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return n;
+}
+
 export function createApp(db: Db, cfg: Config): Hono<App> {
   const app = new Hono<App>();
 
@@ -215,7 +222,9 @@ export function createApp(db: Db, cfg: Config): Hono<App> {
 
   v1.get('/runs', (c) => {
     const limit = parseListLimit(c.req.query('limit'));
-    return c.json({ runs: listRuns(db, limit) });
+    const offset = parseListOffset(c.req.query('offset'));
+    const search = c.req.query('q') ?? c.req.query('search') ?? undefined;
+    return c.json(listRuns(db, { limit, offset, search }));
   });
 
   v1.get('/runs/:run_id', (c) => {

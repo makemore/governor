@@ -215,15 +215,47 @@ export interface RunSummary {
   summary: { items_total: number; items_satisfied: number };
 }
 
+export interface ListRunsOptions {
+  limit: number;
+  offset?: number;
+  search?: string;
+}
+
+export interface RunListResult {
+  runs: RunSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 /**
- * Lightweight enumeration of recent runs for pickers and dashboards. Most
+ * Paginated, searchable enumeration of runs for pickers and dashboards. Most
  * recent first. Each entry carries the gate decision and item counts so a
- * client can show progress without a follow-up request per run.
+ * client can show progress without a follow-up request per run. `search`
+ * matches (case-insensitively) on subject id/label and checklist title; the
+ * returned `total` is the count of matching runs ignoring limit/offset.
  */
-export function listRuns(db: Db, limit: number): RunSummary[] {
+export function listRuns(db: Db, opts: ListRunsOptions): RunListResult {
+  const limit = opts.limit;
+  const offset = Math.max(0, opts.offset ?? 0);
+  const search = (opts.search ?? '').trim();
+
+  let where = '';
+  const params: unknown[] = [];
+  if (search) {
+    where = `WHERE subject_id LIKE ? OR subject_label LIKE ? OR checklist_title LIKE ?`;
+    const like = `%${search}%`;
+    params.push(like, like, like);
+  }
+
+  const totalRow = db.prepare(`SELECT COUNT(*) AS n FROM runs ${where}`).get(...params) as
+    | { n: number }
+    | undefined;
+  const total = totalRow?.n ?? 0;
+
   const rows = db
-    .prepare(`SELECT id FROM runs ORDER BY created_at DESC LIMIT ?`)
-    .all(limit) as { id: string }[];
+    .prepare(`SELECT id FROM runs ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+    .all(...params, limit, offset) as { id: string }[];
   const out: RunSummary[] = [];
   for (const r of rows) {
     const bundle = loadRun(db, r.id);
@@ -242,7 +274,7 @@ export function listRuns(db: Db, limit: number): RunSummary[] {
       summary: gate.summary,
     });
   }
-  return out;
+  return { runs: out, total, limit, offset };
 }
 
 export function gateRun(db: Db, bundle: RunBundle) {

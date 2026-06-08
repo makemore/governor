@@ -84,6 +84,18 @@ paths:
           required: false
           schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
           description: Maximum number of runs to return (clamped to 200).
+        - in: query
+          name: offset
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+          description: Number of matching runs to skip, for pagination.
+        - in: query
+          name: q
+          required: false
+          schema: { type: string }
+          description: >-
+            Case-insensitive substring filter on subject id/label and
+            checklist title.
       responses:
         '200':
           description: OK
@@ -274,6 +286,11 @@ components:
         runs:
           type: array
           items: { $ref: '#/components/schemas/RunSummary' }
+        total:
+          type: integer
+          description: Total number of matching runs, ignoring limit/offset.
+        limit:  { type: integer }
+        offset: { type: integer }
 
     RunSummary:
       type: object
