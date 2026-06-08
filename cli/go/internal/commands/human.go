@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/makemore/governor/cli/go/internal/api"
 	"github.com/makemore/governor/cli/go/internal/config"
 	"github.com/makemore/governor/cli/go/internal/ui"
@@ -63,117 +65,177 @@ func runHumanAttest(ctx context.Context, c *api.Client, name, runID string, all 
 	// switch to one of their configured human personas on the same machine.
 	c, name, me, err := ensureHuman(ctx, c, name)
 	if err != nil {
+		if isBack(err) {
+			return nil // esc while picking a persona just leaves.
+		}
 		return err
 	}
 	fmt.Fprintln(os.Stderr, ui.Sub.Render("→ "+name+" "+c.BaseURL))
 
-	runID = strings.TrimSpace(runID)
-	if runID == "" {
-		runID, err = chooseRun(ctx, c)
-		if err != nil {
-			return err
+	// The flow is a small state machine so esc can walk backwards a screen at a
+	// time: item form → item list → run list → exit. Each huh form binds esc to
+	// abort (see backKeyMap); we catch that here as a "go back" signal.
+	argRun := strings.TrimSpace(runID)
+
+runs:
+	for {
+		// STEP 1 — choose a run, unless one was given on the command line.
+		selRun := argRun
+		if selRun == "" {
+			selRun, err = chooseRun(ctx, c)
+			if isBack(err) {
+				return nil // esc on the run list leaves the command.
+			}
+			if err != nil {
+				return err
+			}
+			if selRun == "" {
+				fmt.Println(ui.Sub.Render("no run selected — nothing to do."))
+				return nil
+			}
 		}
-		if runID == "" {
-			fmt.Println(ui.Sub.Render("no run selected — nothing to do."))
+
+		var run *api.Run
+		var gate *api.GateDecision
+		if err := ui.WithSpinner("loading run", func() error {
+			r, err := c.GetRun(ctx, selRun)
+			if err != nil {
+				return err
+			}
+			g, err := c.Gate(ctx, selRun)
+			if err != nil {
+				return err
+			}
+			run, gate = r, g
 			return nil
-		}
-	}
-
-	var run *api.Run
-	var gate *api.GateDecision
-	if err := ui.WithSpinner("loading run", func() error {
-		r, err := c.GetRun(ctx, runID)
-		if err != nil {
+		}); err != nil {
 			return err
 		}
-		g, err := c.Gate(ctx, runID)
-		if err != nil {
+
+		satisfied := map[string]bool{}
+		reason := map[string]string{}
+		for _, gi := range gate.Items {
+			satisfied[gi.Key] = gi.Satisfied
+			reason[gi.Key] = gi.Reason
+		}
+
+		var cands []api.RunItem
+		for _, it := range run.Items {
+			if satisfied[it.Key] {
+				continue
+			}
+			if all || ruleNeedsHuman(it.Rule) {
+				cands = append(cands, it)
+			}
+		}
+
+		subj := run.Subject.Label
+		if subj == "" {
+			subj = run.Subject.ID
+		}
+		fmt.Println()
+		fmt.Println(ui.Title.Render("Human sign-off") + ui.Sub.Render("  "+subj))
+		fmt.Println(ui.Sub.Render(fmt.Sprintf("%d of %d items satisfied · signing as %s",
+			gate.Summary.ItemsSatisfied, gate.Summary.ItemsTotal, me.DisplayName)))
+
+		if len(cands) == 0 {
+			if gate.Decision == "allow" {
+				fmt.Println(ui.OK.Render("✓ nothing waiting on you — the gate already allows this run."))
+			} else {
+				fmt.Println(ui.Note.Render("Nothing here needs a human signature.") +
+					ui.Sub.Render(" Remaining items are for CI/agents/services. Use --all to sign anything unsatisfied."))
+			}
+			if argRun != "" {
+				return nil
+			}
+			continue runs // back to the run list to pick another.
+		}
+
+		byKey := map[string]api.RunItem{}
+		for _, it := range cands {
+			byKey[it.Key] = it
+		}
+
+		signed := map[string]bool{}
+		recorded, skipped := 0, 0
+
+		// STEP 2 — pick items, then sign each. esc on the item list steps back
+		// to the run list; esc inside an item form steps back to the item list.
+	items:
+		for {
+			remaining := make([]api.RunItem, 0, len(cands))
+			for _, it := range cands {
+				if !signed[it.Key] {
+					remaining = append(remaining, it)
+				}
+			}
+			if len(remaining) == 0 {
+				break items // everything offered has been signed.
+			}
+
+			chosen, err := pickItems(remaining)
+			if isBack(err) {
+				if argRun != "" {
+					break items // no run list to fall back to; wrap up.
+				}
+				continue runs // back to the run list.
+			}
+			if err != nil {
+				return err
+			}
+			if len(chosen) == 0 {
+				if recorded == 0 && skipped == 0 {
+					fmt.Println(ui.Sub.Render("nothing selected — no attestations recorded."))
+				}
+				break items
+			}
+
+			back := false
+			for _, key := range chosen {
+				it := byKey[key]
+				ok, err := attestOneInteractive(ctx, c, selRun, it, reason[key])
+				if isBack(err) {
+					back = true // esc in the form: return to the item list.
+					break
+				}
+				if err != nil {
+					fmt.Println(ui.Bad.Render("✗ "+key+": ") + err.Error())
+					continue
+				}
+				if ok {
+					recorded++
+					signed[key] = true
+				} else {
+					skipped++
+					fmt.Println(ui.Sub.Render("– skipped " + key))
+				}
+			}
+			if back {
+				continue items // re-show the item list with what's left.
+			}
+			break items // batch finished.
+		}
+
+		// Finished with this run: re-evaluate the gate and report.
+		fmt.Println()
+		var g2 *api.GateDecision
+		if err := ui.WithSpinner("re-evaluating gate", func() error {
+			gg, err := c.Gate(ctx, selRun)
+			g2 = gg
+			return err
+		}); err != nil {
 			return err
 		}
-		run, gate = r, g
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	satisfied := map[string]bool{}
-	reason := map[string]string{}
-	for _, gi := range gate.Items {
-		satisfied[gi.Key] = gi.Satisfied
-		reason[gi.Key] = gi.Reason
-	}
-
-	var cands []api.RunItem
-	for _, it := range run.Items {
-		if satisfied[it.Key] {
-			continue
-		}
-		if all || ruleNeedsHuman(it.Rule) {
-			cands = append(cands, it)
-		}
-	}
-
-	subj := run.Subject.Label
-	if subj == "" {
-		subj = run.Subject.ID
-	}
-	fmt.Println()
-	fmt.Println(ui.Title.Render("Human sign-off") + ui.Sub.Render("  "+subj))
-	fmt.Println(ui.Sub.Render(fmt.Sprintf("%d of %d items satisfied · signing as %s",
-		gate.Summary.ItemsSatisfied, gate.Summary.ItemsTotal, me.DisplayName)))
-
-	if len(cands) == 0 {
-		if gate.Decision == "allow" {
-			fmt.Println(ui.OK.Render("✓ nothing waiting on you — the gate already allows this run."))
-			return nil
-		}
-		fmt.Println(ui.Note.Render("Nothing here needs a human signature.") +
-			ui.Sub.Render(" Remaining items are for CI/agents/services. Use --all to sign anything unsatisfied."))
+		fmt.Println(ui.RenderGate(g2))
+		fmt.Fprintln(os.Stderr, ui.Sub.Render(fmt.Sprintf("recorded %d · skipped %d", recorded, skipped)))
 		return nil
 	}
+}
 
-	chosen, err := pickItems(cands)
-	if err != nil {
-		return err
-	}
-	if len(chosen) == 0 {
-		fmt.Println(ui.Sub.Render("nothing selected — no attestations recorded."))
-		return nil
-	}
-
-	byKey := map[string]api.RunItem{}
-	for _, it := range cands {
-		byKey[it.Key] = it
-	}
-
-	signed, skipped := 0, 0
-	for _, key := range chosen {
-		it := byKey[key]
-		ok, err := attestOneInteractive(ctx, c, runID, it, reason[key])
-		if err != nil {
-			fmt.Println(ui.Bad.Render("✗ "+key+": ") + err.Error())
-			continue
-		}
-		if ok {
-			signed++
-		} else {
-			skipped++
-			fmt.Println(ui.Sub.Render("– skipped " + key))
-		}
-	}
-
-	fmt.Println()
-	var g2 *api.GateDecision
-	if err := ui.WithSpinner("re-evaluating gate", func() error {
-		gg, err := c.Gate(ctx, runID)
-		g2 = gg
-		return err
-	}); err != nil {
-		return err
-	}
-	fmt.Println(ui.RenderGate(g2))
-	fmt.Fprintln(os.Stderr, ui.Sub.Render(fmt.Sprintf("recorded %d · skipped %d", signed, skipped)))
-	return nil
+// isBack reports whether a huh form returned because the user pressed esc (or
+// ctrl+c) to abort the current step. The attest flow treats it as "go back".
+func isBack(err error) bool {
+	return errors.Is(err, huh.ErrUserAborted)
 }
 
 // ensureHuman guarantees the returned client signs as a human actor. If the
@@ -225,6 +287,7 @@ func ensureHuman(ctx context.Context, c *api.Client, name string) (*api.Client, 
 			Description(fmt.Sprintf("Active persona %q is a %s — pick a human persona to sign with.", name, me.Kind)).
 			Options(opts...).
 			Value(&pick).
+			WithKeyMap(backKeyMap()).
 			Run(); err != nil {
 			return nil, "", nil, err
 		}
@@ -303,9 +366,10 @@ func chooseRun(ctx context.Context, c *api.Client) (string, error) {
 	pick := runs[0].ID
 	if err := huh.NewSelect[string]().
 		Title("Which run do you want to sign off?").
-		Description("Most recent first. ✗ marks runs the gate still denies.").
+		Description("Most recent first. ✗ marks runs the gate still denies. esc to quit.").
 		Options(opts...).
 		Value(&pick).
+		WithKeyMap(backKeyMap()).
 		Run(); err != nil {
 		return "", err
 	}
@@ -322,6 +386,7 @@ func promptRunID() (string, error) {
 		Description("Paste the run id from your handoff (e.g. 198041d8-…).").
 		Value(&runID).
 		Validate(nonEmpty).
+		WithKeyMap(backKeyMap()).
 		Run(); err != nil {
 		return "", err
 	}
@@ -375,17 +440,18 @@ func pickItems(cands []api.RunItem) ([]string, error) {
 	opts := make([]huh.Option[string], 0, len(cands))
 	for _, it := range cands {
 		label := it.Key
-		if it.Description != "" {
-			label += " — " + it.Description
+		if d := strings.TrimSpace(it.Description); d != "" {
+			label += " — " + truncate(d, 80)
 		}
 		opts = append(opts, huh.NewOption(label, it.Key).Selected(true))
 	}
 	chosen := []string{}
 	err := huh.NewMultiSelect[string]().
 		Title("Which items are you ready to sign now?").
-		Description("Space toggles, Enter confirms. Only sign for work you actually verified.").
+		Description("Space toggles, Enter confirms, esc goes back. Only sign for work you actually verified.").
 		Options(opts...).
 		Value(&chosen).
+		WithKeyMap(backKeyMap()).
 		Run()
 	return chosen, err
 }
@@ -394,22 +460,12 @@ func pickItems(cands []api.RunItem) ([]string, error) {
 // asks for an explicit confirmation, then records the attestation. The bool is
 // false (with nil error) when the user chose to skip at the confirm step.
 func attestOneInteractive(ctx context.Context, c *api.Client, runID string, it api.RunItem, reason string) (bool, error) {
-	intro := describeRule(it.Rule)
-	if it.Description != "" {
-		intro = it.Description + "\nrule: " + intro
-	} else {
-		intro = "rule: " + intro
-	}
-	if reason != "" {
-		intro += "\nstatus: " + reason
-	}
-
 	outcome := "pass"
 	var note, detail, evidence string
 	confirm := false
 	form := huh.NewForm(
 		huh.NewGroup(
-			huh.NewNote().Title("● "+it.Key).Description(intro),
+			huh.NewNote().Title("● "+it.Key).Description(itemBriefing(it, reason)),
 			huh.NewSelect[string]().
 				Title("Outcome").
 				Description("pass and waived satisfy the gate; fail is recorded but never satisfies it.").
@@ -435,7 +491,7 @@ func attestOneInteractive(ctx context.Context, c *api.Client, runID string, it a
 				Negative("Skip").
 				Value(&confirm),
 		),
-	)
+	).WithKeyMap(backKeyMap())
 	if err := form.Run(); err != nil {
 		return false, err
 	}
@@ -536,4 +592,48 @@ func joinRules(v any) string {
 		}
 	}
 	return strings.Join(parts, "; ")
+}
+
+// backKeyMap binds esc to the form-level Quit so it aborts the current step from
+// any field — including the very first one, where huh disables the per-field
+// Prev (shift+tab) binding. The attest flow catches that abort (isBack) and
+// re-shows the previous screen, giving esc consistent "go back" behaviour:
+// item form → item list → run list → exit. shift+tab still steps between fields
+// within a form, and ctrl+c still aborts.
+func backKeyMap() *huh.KeyMap {
+	km := huh.NewDefaultKeyMap()
+	km.Quit.SetKeys("ctrl+c", "esc")
+	km.Quit.SetHelp("esc", "back")
+	return km
+}
+
+// itemBriefing renders the context a signer sees before attesting one item:
+// the human-written description (wrapped) up top, then a plain-English summary
+// of what the rule requires and the gate's current reason for it being unmet.
+func itemBriefing(it api.RunItem, reason string) string {
+	wrap := lipgloss.NewStyle().Width(76)
+	var b strings.Builder
+	if d := strings.TrimSpace(it.Description); d != "" {
+		b.WriteString(wrap.Render(d))
+		b.WriteString("\n\n")
+	}
+	b.WriteString("What this asserts: " + describeRule(it.Rule))
+	if r := strings.TrimSpace(reason); r != "" {
+		b.WriteString("\nGate status: " + r)
+	}
+	b.WriteString("\n\nshift+tab moves between fields · esc goes back to the item list.")
+	return b.String()
+}
+
+// truncate shortens a string to at most n characters (collapsing newlines to
+// spaces) and appends an ellipsis when it had to cut.
+func truncate(s string, n int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) <= n {
+		return s
+	}
+	if n <= 1 {
+		return s[:n]
+	}
+	return strings.TrimSpace(s[:n-1]) + "…"
 }
